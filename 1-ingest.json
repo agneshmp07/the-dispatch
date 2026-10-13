@@ -1,0 +1,452 @@
+{
+  "name": "Dispatch 1 · Ingest articles",
+  "nodes": [
+    {
+      "id": "089b5001-702c-4b4c-9dbb-d0769990797f",
+      "name": "Mon–Wed every 4h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6,10,14 * * 1-3"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "121d9781-f73e-48ab-bbbe-53871fb5db01",
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "e1b16ccf-1dbb-475a-9ea3-0183f8124384",
+      "name": "Load sources",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, name, kind, url, CASE WHEN kind = 'newsdata' THEN d_cfg('newsdata_api_key', '') END AS api_key FROM sources WHERE active ORDER BY id;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "217785ce-bf7e-49c2-b88c-34bfd298dbe8",
+      "name": "Build feed URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// ---- shared helpers (prepended to every Code node by build.js) ----\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst toB64 = (o) => {\n  const s = JSON.stringify(o);\n  if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');\n  return btoa(String.fromCharCode(...new TextEncoder().encode(s)));\n};\nconst istDate = (d, opts) => new Date(d).toLocaleString('en-IN', Object.assign({ timeZone: 'Asia/Kolkata' }, opts || { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }));\nconst cfgList = (v) => String(v || '').split('|').map((x) => x.trim()).filter(Boolean);\nconst num = (v, d) => (Number.isFinite(Number(v)) && String(v) !== '' ? Number(v) : d);\n\nfunction geminiJson(resp) {\n  const parts = resp?.candidates?.[0]?.content?.parts || [];\n  let txt = parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n  if (!txt) throw new Error('Gemini returned no text: ' + JSON.stringify(resp).slice(0, 600));\n  txt = txt.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '');\n  try { return JSON.parse(txt); } catch (e) {\n    const m = txt.match(/\\{[\\s\\S]*\\}/);\n    if (m) return JSON.parse(m[0]);\n    throw new Error('Gemini returned invalid JSON: ' + txt.slice(0, 400));\n  }\n}\n\n// ---- Telegram rendering ----\nconst TG_LIMIT = 3900;\nfunction stateBadge(it) {\n  if (it.state === 'kept') return it.edited ? '✏️ Edited & kept' : '✅ Kept';\n  if (it.state === 'dropped') return '🗑 Dropped';\n  return '⏳ Awaiting review';\n}\nfunction renderItem(it) {\n  const head = `<b>#${it.position} · ${esc(it.topic)}</b>`;\n  const title = `<a href=\"${esc(it.url)}\">${esc(it.title)}</a>` + (it.source ? ` (<i>${esc(it.source)}</i>)` : '');\n  const commentary = it.commentary ? esc(it.commentary) : '<i>(no commentary yet: tap ✏️ Edit)</i>';\n  const body = it.state === 'dropped' ? `<s>${commentary}</s>` : commentary;\n  const why = it.reason && it.state !== 'dropped' ? `\\n\\n<i>Why picked: ${esc(it.reason)}</i>` : '';\n  return `${head}\\n${title}\\n\\n${body}${why}\\n\\n${stateBadge(it)}`.slice(0, TG_LIMIT);\n}\nfunction itemKeyboard(it) {\n  if (it.state === 'dropped') return { inline_keyboard: [[{ text: '↩️ Restore', callback_data: `r:${it.item_id}` }]] };\n  return { inline_keyboard: [\n    [{ text: '✅ Keep', callback_data: `k:${it.item_id}` }, { text: '🔁 Swap', callback_data: `s:${it.item_id}` }],\n    [{ text: '✏️ Edit', callback_data: `e:${it.item_id}` }, { text: '🗑 Drop', callback_data: `d:${it.item_id}` }],\n  ] };\n}\nconst approveKeyboard = (issueId) => ({ inline_keyboard: [[{ text: '📋 Review final draft & approve', callback_data: `a:${issueId}` }]] });\nconst confirmKeyboard = (issueId) => ({ inline_keyboard: [\n  [{ text: '✅ Confirm & schedule send', callback_data: `c:${issueId}` }],\n  [{ text: '↩️ Keep editing', callback_data: `x:${issueId}` }],\n] });\n\nfunction draftWarnings(v, cfg) {\n  const w = [];\n  const min = num(cfg.min_stories, 8), max = num(cfg.max_stories, 10), minT = num(cfg.min_topics, 3);\n  if (v.active_count < min || v.active_count > max) w.push(`${v.active_count} stories (target ${min}–${max})`);\n  if (v.topic_count < minT) w.push(`only ${v.topic_count} topic areas (target ≥${minT})`);\n  if ((v.items || []).some((i) => i.state !== 'dropped' && !i.commentary)) w.push('some stories have no commentary');\n  return w;\n}\nfunction summaryLine(v) {\n  return `${v.active_count} stories · ${v.topic_count} topics · ${v.pending_count} awaiting review · ${v.alternates_left} alternates left`;\n}\nfunction previewChunks(v, cfg) {\n  const iss = v.issue;\n  const live = (v.items || []).filter((i) => i.state !== 'dropped');\n  const parts = [`<b>${esc(cfg.newsletter_name || 'The Dispatch')}: final draft</b>\\n${summaryLine(v)}` +\n    (iss.intro ? `\\n\\n<i>${esc(iss.intro)}</i>` : '\\n\\n<i>(no intro: add one with /intro your text)</i>')];\n  live.forEach((it, idx) => {\n    parts.push(`<b>${idx + 1}. ${esc(it.title)}</b> <i>[${esc(it.topic)}]</i>\\n${esc(it.commentary || '(no commentary)')}`);\n  });\n  if (iss.sponsor && iss.sponsor.text) parts.push(`<b>Sponsor:</b> ${esc(iss.sponsor.text)}${iss.sponsor.url ? ' (' + esc(iss.sponsor.url) + ')' : ''}`);\n  const w = draftWarnings(v, cfg);\n  let tail = `\\nSends to <b>${v.active_subscribers}</b> active subscribers at <b>${istDate(v.send_at)}</b> IST, and only after you tap Confirm.`;\n  if (w.length) tail = `\\n⚠️ ${esc(w.join('; '))}` + tail;\n  parts.push(tail);\n  const chunks = []; let cur = '';\n  for (const p of parts) {\n    if ((cur + '\\n\\n' + p).length > TG_LIMIT && cur) { chunks.push(cur); cur = p; } else cur = cur ? cur + '\\n\\n' + p : p;\n  }\n  if (cur) chunks.push(cur);\n  return chunks.map((c) => c.slice(0, 4090));\n}\nconst HELP = [\n  '<b>The Dispatch bot</b>',\n  'Each story in the weekly draft has buttons:',\n  '✅ Keep · 🔁 Swap (next-best alternate) · ✏️ Edit commentary · 🗑 Drop',\n  '',\n  '📌 Paste any link here during the week and it\\'s guaranteed a spot in the next draft (add a note after the link if you like).',\n  '',\n  '🎙 Or just send a voice note: \"drop 3\", \"swap 5\", \"edit 2: new commentary…\", \"intro …\", \"approve\". I\\'ll show what I heard.',\n  'Typed works too: <b>keep 1</b> · <b>drop 3</b> · <b>swap 5</b> · <b>restore 3</b> · <b>edit 2: new text</b>',\n  '',\n  'Just type a word (no / needed):',\n  '<b>status</b>: draft summary',\n  '<b>alternates</b>: runners-up you can add with one tap',\n  '<b>intro</b> your text: set this week\\'s 2-line opener',\n  '<b>sponsor</b> text | link: add a sponsor block (<b>nosponsor</b> removes it)',\n  '<b>stats</b>: subscribers, opens, clicks, source health',\n  '<b>preview</b>: show the full draft',\n  '<b>approve</b>: review & confirm the final draft',\n  '<b>unapprove</b>: withdraw approval before sending starts',\n  '<b>cancel</b>: cancel an edit in progress',\n  '<b>selftest</b>: check the bot end to end',\n  '<b>testsend</b>: email the current draft to yourself only',\n  '<b>newskey</b> KEY: connect the NewsData.io news API',\n  '<b>read 3</b>: the full article Gemini read for story 3',\n  '<b>voice</b>: your voice guide · <b>voicerule</b> text: add a house rule',\n  '<b>suggestions</b>: links readers sent from the website (<b>take 12</b> / <b>skip 12</b>)',\n  '',\n  'Nothing is ever emailed until you tap <b>Confirm & schedule send</b>.',\n].join('\\n');\n\n// ---- Email rendering ----\nfunction renderEmail(v, cfg, r) {\n  const iss = v.issue;\n  const items = (v.items || []).filter((i) => i.state === 'kept' || i.state === 'proposed');\n  const name = cfg.newsletter_name || 'The Dispatch';\n  const dateStr = istDate(`${iss.week_start}T12:00:00+05:30`, { day: 'numeric', month: 'long', year: 'numeric' });\n  const base = String(cfg.public_base_url || '').replace(/\\/+$/, '');\n  const unsub = `${base}/webhook/dispatch-unsubscribe?t=${encodeURIComponent(r.unsub_token)}`;\n  const site = String(cfg.site_url || '').replace(/\\/+$/, '');\n  const webUrl = site ? `${site}/issue/${encodeURIComponent(iss.issue_no)}` : '';\n  const stories = items.map((it, i) => `\n      <tr><td style=\"padding:22px 0;border-top:1px solid #e6e6e6;\">\n        <div style=\"font:600 11px/1.4 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#b4441b;\">${i + 1} · ${esc(it.topic)}</div>\n        <a href=\"${esc(it.url)}\" style=\"display:block;margin:6px 0 8px;font:700 19px/1.35 Georgia,serif;color:#111;text-decoration:none;\">${esc(it.title)}</a>\n        <div style=\"font:16px/1.6 Georgia,serif;color:#333;\">${esc(it.commentary)}</div>\n        <div style=\"margin-top:8px;font:13px/1.4 Arial,sans-serif;color:#777;\">${esc(it.source || '')} · <a href=\"${esc(it.url)}\" style=\"color:#b4441b;\">Read →</a></div>\n      </td></tr>`).join('');\n  const html = `<!doctype html><html><body style=\"margin:0;background:#f6f4ef;\">\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f6f4ef;\"><tr><td align=\"center\" style=\"padding:24px 12px;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:620px;background:#fff;padding:0 28px;\">\n      <tr><td style=\"padding:28px 0 18px;\">\n        <div style=\"font:700 28px/1.2 Georgia,serif;color:#111;\">${esc(name)}</div>\n        <div style=\"font:13px/1.5 Arial,sans-serif;color:#777;\">Issue #${esc(iss.issue_no)} · ${esc(dateStr)}${cfg.newsletter_tagline ? ' · ' + esc(cfg.newsletter_tagline) : ''}${webUrl ? ` · <a href=\"${esc(webUrl)}\" style=\"color:#777;\">View in browser</a>` : ''}</div>\n      </td></tr>${iss.intro ? `\n      <tr><td style=\"padding:0 0 22px;font:italic 17px/1.6 Georgia,serif;color:#333;\">${esc(iss.intro)}</td></tr>` : ''}${stories}${iss.sponsor && iss.sponsor.text ? `\n      <tr><td style=\"padding:18px;border:1px dashed #d9cfc2;border-radius:8px;background:#fbf8f2;\">\n        <div style=\"font:600 10px/1.4 Arial,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999;\">Sponsored</div>\n        <div style=\"margin-top:6px;font:15px/1.55 Georgia,serif;color:#333;\">${esc(iss.sponsor.text)}${iss.sponsor.url ? ` <a href=\"${esc(iss.sponsor.url)}\" style=\"color:#b4441b;\">Learn more →</a>` : ''}</div>\n      </td></tr>` : ''}\n      <tr><td style=\"padding:22px 0 30px;border-top:1px solid #e6e6e6;font:12px/1.6 Arial,sans-serif;color:#888;\">\n        You're receiving this because you subscribed to ${esc(name)}.<br>\n        <a href=\"${esc(unsub)}\" style=\"color:#888;\">Unsubscribe in one click</a>, or reply with \"unsubscribe\".\n      </td></tr>\n    </table></td></tr></table></body></html>`;\n  const lead = items[0] ? items[0].title : '';\n  const subject = `${name} #${iss.issue_no}: ${lead}`.slice(0, 120);\n  return { subject, html, unsub, webUrl };\n}\n// ---- end shared helpers ----\n\n// Turn source rows into fetchable URLs (Google News queries need no key; NewsData.io needs newsdata_api_key)\nconst out = [];\nfor (const { json: s } of $input.all()) {\n  let feed_url = s.url;\n  if (s.kind === 'gnews') {\n    feed_url = 'https://news.google.com/rss/search?q=' + encodeURIComponent(`${s.url} when:3d`) + '&hl=en-IN&gl=IN&ceid=IN:en';\n  } else if (s.kind === 'newsdata') {\n    if (!s.api_key) continue;                       // not set up yet: skip quietly\n    feed_url = 'https://newsdata.io/api/1/latest?apikey=' + encodeURIComponent(s.api_key) +\n      '&country=in&language=en&q=' + encodeURIComponent(s.url);\n  }\n  out.push({ json: { source_id: s.id, name: s.name, kind: s.kind, feed_url } });\n}\nreturn out;\n"
+      }
+    },
+    {
+      "id": "4e2e3ab4-e746-43e6-b6de-dbb8b87de102",
+      "name": "Loop feeds",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        720,
+        100
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "8b899c2d-3206-4d2c-a104-42f867f59bf8",
+      "name": "Read feed",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        200
+      ],
+      "parameters": {
+        "url": "={{ $json.feed_url }}",
+        "options": {
+          "ignoreSSL": false
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "923c253a-1bdf-444a-b61f-1bc98683ac60",
+      "name": "News API?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        960,
+        60
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "77198a57-22de-4b6d-a025-249fe5a714d3",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.kind }}",
+              "rightValue": "newsdata"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "dbb5957f-3a2f-4524-97ec-42b9e043fcab",
+      "name": "Call news API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        60
+      ],
+      "parameters": {
+        "url": "={{ $json.feed_url }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "de8c41bb-32ea-40ea-b870-13584560a887",
+      "name": "Normalize items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// ---- shared helpers (prepended to every Code node by build.js) ----\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst toB64 = (o) => {\n  const s = JSON.stringify(o);\n  if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');\n  return btoa(String.fromCharCode(...new TextEncoder().encode(s)));\n};\nconst istDate = (d, opts) => new Date(d).toLocaleString('en-IN', Object.assign({ timeZone: 'Asia/Kolkata' }, opts || { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }));\nconst cfgList = (v) => String(v || '').split('|').map((x) => x.trim()).filter(Boolean);\nconst num = (v, d) => (Number.isFinite(Number(v)) && String(v) !== '' ? Number(v) : d);\n\nfunction geminiJson(resp) {\n  const parts = resp?.candidates?.[0]?.content?.parts || [];\n  let txt = parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n  if (!txt) throw new Error('Gemini returned no text: ' + JSON.stringify(resp).slice(0, 600));\n  txt = txt.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '');\n  try { return JSON.parse(txt); } catch (e) {\n    const m = txt.match(/\\{[\\s\\S]*\\}/);\n    if (m) return JSON.parse(m[0]);\n    throw new Error('Gemini returned invalid JSON: ' + txt.slice(0, 400));\n  }\n}\n\n// ---- Telegram rendering ----\nconst TG_LIMIT = 3900;\nfunction stateBadge(it) {\n  if (it.state === 'kept') return it.edited ? '✏️ Edited & kept' : '✅ Kept';\n  if (it.state === 'dropped') return '🗑 Dropped';\n  return '⏳ Awaiting review';\n}\nfunction renderItem(it) {\n  const head = `<b>#${it.position} · ${esc(it.topic)}</b>`;\n  const title = `<a href=\"${esc(it.url)}\">${esc(it.title)}</a>` + (it.source ? ` (<i>${esc(it.source)}</i>)` : '');\n  const commentary = it.commentary ? esc(it.commentary) : '<i>(no commentary yet: tap ✏️ Edit)</i>';\n  const body = it.state === 'dropped' ? `<s>${commentary}</s>` : commentary;\n  const why = it.reason && it.state !== 'dropped' ? `\\n\\n<i>Why picked: ${esc(it.reason)}</i>` : '';\n  return `${head}\\n${title}\\n\\n${body}${why}\\n\\n${stateBadge(it)}`.slice(0, TG_LIMIT);\n}\nfunction itemKeyboard(it) {\n  if (it.state === 'dropped') return { inline_keyboard: [[{ text: '↩️ Restore', callback_data: `r:${it.item_id}` }]] };\n  return { inline_keyboard: [\n    [{ text: '✅ Keep', callback_data: `k:${it.item_id}` }, { text: '🔁 Swap', callback_data: `s:${it.item_id}` }],\n    [{ text: '✏️ Edit', callback_data: `e:${it.item_id}` }, { text: '🗑 Drop', callback_data: `d:${it.item_id}` }],\n  ] };\n}\nconst approveKeyboard = (issueId) => ({ inline_keyboard: [[{ text: '📋 Review final draft & approve', callback_data: `a:${issueId}` }]] });\nconst confirmKeyboard = (issueId) => ({ inline_keyboard: [\n  [{ text: '✅ Confirm & schedule send', callback_data: `c:${issueId}` }],\n  [{ text: '↩️ Keep editing', callback_data: `x:${issueId}` }],\n] });\n\nfunction draftWarnings(v, cfg) {\n  const w = [];\n  const min = num(cfg.min_stories, 8), max = num(cfg.max_stories, 10), minT = num(cfg.min_topics, 3);\n  if (v.active_count < min || v.active_count > max) w.push(`${v.active_count} stories (target ${min}–${max})`);\n  if (v.topic_count < minT) w.push(`only ${v.topic_count} topic areas (target ≥${minT})`);\n  if ((v.items || []).some((i) => i.state !== 'dropped' && !i.commentary)) w.push('some stories have no commentary');\n  return w;\n}\nfunction summaryLine(v) {\n  return `${v.active_count} stories · ${v.topic_count} topics · ${v.pending_count} awaiting review · ${v.alternates_left} alternates left`;\n}\nfunction previewChunks(v, cfg) {\n  const iss = v.issue;\n  const live = (v.items || []).filter((i) => i.state !== 'dropped');\n  const parts = [`<b>${esc(cfg.newsletter_name || 'The Dispatch')}: final draft</b>\\n${summaryLine(v)}` +\n    (iss.intro ? `\\n\\n<i>${esc(iss.intro)}</i>` : '\\n\\n<i>(no intro: add one with /intro your text)</i>')];\n  live.forEach((it, idx) => {\n    parts.push(`<b>${idx + 1}. ${esc(it.title)}</b> <i>[${esc(it.topic)}]</i>\\n${esc(it.commentary || '(no commentary)')}`);\n  });\n  if (iss.sponsor && iss.sponsor.text) parts.push(`<b>Sponsor:</b> ${esc(iss.sponsor.text)}${iss.sponsor.url ? ' (' + esc(iss.sponsor.url) + ')' : ''}`);\n  const w = draftWarnings(v, cfg);\n  let tail = `\\nSends to <b>${v.active_subscribers}</b> active subscribers at <b>${istDate(v.send_at)}</b> IST, and only after you tap Confirm.`;\n  if (w.length) tail = `\\n⚠️ ${esc(w.join('; '))}` + tail;\n  parts.push(tail);\n  const chunks = []; let cur = '';\n  for (const p of parts) {\n    if ((cur + '\\n\\n' + p).length > TG_LIMIT && cur) { chunks.push(cur); cur = p; } else cur = cur ? cur + '\\n\\n' + p : p;\n  }\n  if (cur) chunks.push(cur);\n  return chunks.map((c) => c.slice(0, 4090));\n}\nconst HELP = [\n  '<b>The Dispatch bot</b>',\n  'Each story in the weekly draft has buttons:',\n  '✅ Keep · 🔁 Swap (next-best alternate) · ✏️ Edit commentary · 🗑 Drop',\n  '',\n  '📌 Paste any link here during the week and it\\'s guaranteed a spot in the next draft (add a note after the link if you like).',\n  '',\n  '🎙 Or just send a voice note: \"drop 3\", \"swap 5\", \"edit 2: new commentary…\", \"intro …\", \"approve\". I\\'ll show what I heard.',\n  'Typed works too: <b>keep 1</b> · <b>drop 3</b> · <b>swap 5</b> · <b>restore 3</b> · <b>edit 2: new text</b>',\n  '',\n  'Just type a word (no / needed):',\n  '<b>status</b>: draft summary',\n  '<b>alternates</b>: runners-up you can add with one tap',\n  '<b>intro</b> your text: set this week\\'s 2-line opener',\n  '<b>sponsor</b> text | link: add a sponsor block (<b>nosponsor</b> removes it)',\n  '<b>stats</b>: subscribers, opens, clicks, source health',\n  '<b>preview</b>: show the full draft',\n  '<b>approve</b>: review & confirm the final draft',\n  '<b>unapprove</b>: withdraw approval before sending starts',\n  '<b>cancel</b>: cancel an edit in progress',\n  '<b>selftest</b>: check the bot end to end',\n  '<b>testsend</b>: email the current draft to yourself only',\n  '<b>newskey</b> KEY: connect the NewsData.io news API',\n  '<b>read 3</b>: the full article Gemini read for story 3',\n  '<b>voice</b>: your voice guide · <b>voicerule</b> text: add a house rule',\n  '<b>suggestions</b>: links readers sent from the website (<b>take 12</b> / <b>skip 12</b>)',\n  '',\n  'Nothing is ever emailed until you tap <b>Confirm & schedule send</b>.',\n].join('\\n');\n\n// ---- Email rendering ----\nfunction renderEmail(v, cfg, r) {\n  const iss = v.issue;\n  const items = (v.items || []).filter((i) => i.state === 'kept' || i.state === 'proposed');\n  const name = cfg.newsletter_name || 'The Dispatch';\n  const dateStr = istDate(`${iss.week_start}T12:00:00+05:30`, { day: 'numeric', month: 'long', year: 'numeric' });\n  const base = String(cfg.public_base_url || '').replace(/\\/+$/, '');\n  const unsub = `${base}/webhook/dispatch-unsubscribe?t=${encodeURIComponent(r.unsub_token)}`;\n  const site = String(cfg.site_url || '').replace(/\\/+$/, '');\n  const webUrl = site ? `${site}/issue/${encodeURIComponent(iss.issue_no)}` : '';\n  const stories = items.map((it, i) => `\n      <tr><td style=\"padding:22px 0;border-top:1px solid #e6e6e6;\">\n        <div style=\"font:600 11px/1.4 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#b4441b;\">${i + 1} · ${esc(it.topic)}</div>\n        <a href=\"${esc(it.url)}\" style=\"display:block;margin:6px 0 8px;font:700 19px/1.35 Georgia,serif;color:#111;text-decoration:none;\">${esc(it.title)}</a>\n        <div style=\"font:16px/1.6 Georgia,serif;color:#333;\">${esc(it.commentary)}</div>\n        <div style=\"margin-top:8px;font:13px/1.4 Arial,sans-serif;color:#777;\">${esc(it.source || '')} · <a href=\"${esc(it.url)}\" style=\"color:#b4441b;\">Read →</a></div>\n      </td></tr>`).join('');\n  const html = `<!doctype html><html><body style=\"margin:0;background:#f6f4ef;\">\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f6f4ef;\"><tr><td align=\"center\" style=\"padding:24px 12px;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:620px;background:#fff;padding:0 28px;\">\n      <tr><td style=\"padding:28px 0 18px;\">\n        <div style=\"font:700 28px/1.2 Georgia,serif;color:#111;\">${esc(name)}</div>\n        <div style=\"font:13px/1.5 Arial,sans-serif;color:#777;\">Issue #${esc(iss.issue_no)} · ${esc(dateStr)}${cfg.newsletter_tagline ? ' · ' + esc(cfg.newsletter_tagline) : ''}${webUrl ? ` · <a href=\"${esc(webUrl)}\" style=\"color:#777;\">View in browser</a>` : ''}</div>\n      </td></tr>${iss.intro ? `\n      <tr><td style=\"padding:0 0 22px;font:italic 17px/1.6 Georgia,serif;color:#333;\">${esc(iss.intro)}</td></tr>` : ''}${stories}${iss.sponsor && iss.sponsor.text ? `\n      <tr><td style=\"padding:18px;border:1px dashed #d9cfc2;border-radius:8px;background:#fbf8f2;\">\n        <div style=\"font:600 10px/1.4 Arial,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999;\">Sponsored</div>\n        <div style=\"margin-top:6px;font:15px/1.55 Georgia,serif;color:#333;\">${esc(iss.sponsor.text)}${iss.sponsor.url ? ` <a href=\"${esc(iss.sponsor.url)}\" style=\"color:#b4441b;\">Learn more →</a>` : ''}</div>\n      </td></tr>` : ''}\n      <tr><td style=\"padding:22px 0 30px;border-top:1px solid #e6e6e6;font:12px/1.6 Arial,sans-serif;color:#888;\">\n        You're receiving this because you subscribed to ${esc(name)}.<br>\n        <a href=\"${esc(unsub)}\" style=\"color:#888;\">Unsubscribe in one click</a>, or reply with \"unsubscribe\".\n      </td></tr>\n    </table></td></tr></table></body></html>`;\n  const lead = items[0] ? items[0].title : '';\n  const subject = `${name} #${iss.issue_no}: ${lead}`.slice(0, 120);\n  return { subject, html, unsub, webUrl };\n}\n// ---- end shared helpers ----\n\n// Normalise one feed's items into an ingest payload (runs once per feed in the loop)\nconst src = $('Loop feeds').first().json;\nlet rows = $input.all().map((i) => i.json);\nif (src.kind === 'newsdata') {                         // news API JSON -> RSS-like rows\n  const j = rows[0] || {};\n  if (j.status !== 'success') {\n    const msg = (j.results && j.results.message) || j.message || j.error || ('HTTP ' + (j.statusCode || 'error'));\n    rows = [{ error: 'News API: ' + (typeof msg === 'string' ? msg : JSON.stringify(msg)).slice(0, 200) }];\n  } else {\n    rows = (j.results || []).map((a) => ({ link: a.link, title: a.title, description: a.description,\n      isoDate: a.pubDate ? String(a.pubDate).replace(' ', 'T') + 'Z' : null, _source: a.source_name || a.source_id, _image: a.image_url || null }));\n  }\n}\nconst TRACKING = /^(utm_|fbclid$|gclid$|ref$|ref_src$|mc_|igshid$|cmpid$|ito$|from$|source$)/i;\nfunction canon(u) {\n  try {\n    const x = new URL(String(u).trim());\n    x.hash = '';\n    x.hostname = x.hostname.toLowerCase().replace(/^www\\./, '');\n    for (const k of [...x.searchParams.keys()]) if (TRACKING.test(k)) x.searchParams.delete(k);\n    return x.toString().replace(/\\/$/, '');\n  } catch (e) { return String(u || '').trim(); }\n}\nconst strip = (h) => String(h || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')\n  .replace(/&#8217;|&rsquo;/g, \"'\").replace(/&#8216;|&lsquo;/g, \"'\").replace(/&#8220;|&#8221;|&ldquo;|&rdquo;/g, '\"')\n  .replace(/&#\\d+;/g, ' ').replace(/\\s+/g, ' ').trim();\n\n// Distinctive tokens (companies, people, numbers) used to stop formulaic headlines\n// (\"X raises Series A\") from being mistaken for the same story.\nconst STOP = new Set(('a an the and or of in on for to with by at from as is are was were be its it this that new first after over into amid via vs than '+\n  'india indias indian startup startups unicorn company companies firm founder founders ceo cofounder report reports sources says said '+\n  'raises raised raise funding round series seed pre led leads backed investors investor invest invests investment vc vcs fund funds '+\n  'acquires acquire acquisition buys buy merger merges stake valuation crore cr lakh million billion mn bn usd rs inr '+\n  'launches launch launched unveils rolls out expands expansion enters entry plans plan eyes set sets bets bet '+\n  'files filing drhp ipo listing listed public market markets shares share stock stocks '+\n  'cuts cut layoffs layoff lays off jobs employees staff hiring hires appoints exits exit quits resigns '+\n  'posts profit profitable loss losses revenue revenues quarter fy fy24 fy25 fy26 q1 q2 q3 q4 growth grows jumps falls rises '+\n  'ai tech app platform deal deals business sector industry week year today why how what who').split(/\\s+/));\nfunction entities(title) {\n  const out = new Set();\n  for (const w of String(title).split(/[^A-Za-z0-9&]+/)) {\n    const lw = w.toLowerCase();\n    if (w.length < 2 || STOP.has(lw)) continue;\n    if (/^[A-Z]/.test(w) || /\\d/.test(w) || /[A-Z]{2,}/.test(w)) out.add(lw);\n  }\n  return [...out].slice(0, 12);\n}\n\n// the article's own picture, when the feed carries one (enclosure, media tag or first <img> in the body)\nfunction imageOf(r) {\n  const ok = (u) => (typeof u === 'string' && /^https:\\/\\/\\S+$/i.test(u.trim()) ? u.trim() : null);\n  if (r._image) return ok(r._image);\n  const enc = r.enclosure || {};\n  if (enc.url && (/^image\\//i.test(enc.type || '') || /\\.(jpe?g|png|webp)(\\?|$)/i.test(enc.url))) return ok(enc.url);\n  for (const k of ['media:content', 'media:thumbnail', 'mediaContent', 'mediaThumbnail']) {\n    const m = r[k]; const u = m && (m.url || (m.$ && m.$.url) || (Array.isArray(m) && m[0] && (m[0].url || (m[0].$ && m[0].$.url))));\n    if (u) return ok(u);\n  }\n  const html = String(r['content:encoded'] || r.content || r.description || '');\n  const img = html.match(/<img[^>]+src=[\"']([^\"']+)[\"']/i);\n  return img ? ok(img[1].replace(/&amp;/g, '&')) : null;\n}\n\nlet payload;\nif (rows.length === 1 && rows[0].error) {\n  const e = rows[0].error;\n  payload = { source_id: src.source_id, error: typeof e === 'string' ? e : (e.message || JSON.stringify(e)) };\n} else {\n  const items = [];\n  for (const r of rows) {\n    if (!r || !r.link || !r.title) continue;\n    let title = strip(r.title), source_name = r._source || null;\n    if (src.kind === 'gnews') {                       // \"Headline - Publisher\"\n      const m = title.match(/^(.*\\S)\\s+[-–—|]\\s+([^-–—|]{2,60})$/);\n      if (m) { title = m[1]; source_name = m[2].trim(); }\n    }\n    items.push({\n      url: String(r.link).trim(),\n      canon: canon(r.link),\n      title,\n      entities: entities(title),\n      source_name,\n      summary: strip(r.contentSnippet || r.content || r.summary || r.description || '').slice(0, 1200),\n      published_at: r.isoDate || r.pubDate || null,\n      image: imageOf(r),\n    });\n  }\n  payload = { source_id: src.source_id, items };\n}\nreturn [{ json: { b64: toB64(payload), count: payload.items ? payload.items.length : 0, error: payload.error || null } }];\n"
+      }
+    },
+    {
+      "id": "e592af39-154e-47b8-9dae-d79831e14bae",
+      "name": "Store + dedup",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1440,
+        200
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT s.r AS result, save_ingest_images($1) AS images FROM (SELECT ingest_batch($1) AS r OFFSET 0) s;",
+        "options": {
+          "queryReplacement": "={{ $json.b64 }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "891f7e97-7d46-49c6-a124-7c5033248d2b",
+      "name": "Feed health",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        960,
+        -60
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT name, last_ok_at, last_error, last_counts FROM sources WHERE active ORDER BY last_error NULLS LAST, name;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "4dea1cec-932b-482e-81b5-609405372114",
+      "name": "Broken feeds",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        960,
+        -240
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT feed_alerts() AS bad, d_config_json() AS cfg;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "c323014d-9575-4a97-b893-d1f396e7159e",
+      "name": "Build feed alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -240
+      ],
+      "parameters": {
+        "jsCode": "// ---- shared helpers (prepended to every Code node by build.js) ----\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst toB64 = (o) => {\n  const s = JSON.stringify(o);\n  if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');\n  return btoa(String.fromCharCode(...new TextEncoder().encode(s)));\n};\nconst istDate = (d, opts) => new Date(d).toLocaleString('en-IN', Object.assign({ timeZone: 'Asia/Kolkata' }, opts || { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }));\nconst cfgList = (v) => String(v || '').split('|').map((x) => x.trim()).filter(Boolean);\nconst num = (v, d) => (Number.isFinite(Number(v)) && String(v) !== '' ? Number(v) : d);\n\nfunction geminiJson(resp) {\n  const parts = resp?.candidates?.[0]?.content?.parts || [];\n  let txt = parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n  if (!txt) throw new Error('Gemini returned no text: ' + JSON.stringify(resp).slice(0, 600));\n  txt = txt.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '');\n  try { return JSON.parse(txt); } catch (e) {\n    const m = txt.match(/\\{[\\s\\S]*\\}/);\n    if (m) return JSON.parse(m[0]);\n    throw new Error('Gemini returned invalid JSON: ' + txt.slice(0, 400));\n  }\n}\n\n// ---- Telegram rendering ----\nconst TG_LIMIT = 3900;\nfunction stateBadge(it) {\n  if (it.state === 'kept') return it.edited ? '✏️ Edited & kept' : '✅ Kept';\n  if (it.state === 'dropped') return '🗑 Dropped';\n  return '⏳ Awaiting review';\n}\nfunction renderItem(it) {\n  const head = `<b>#${it.position} · ${esc(it.topic)}</b>`;\n  const title = `<a href=\"${esc(it.url)}\">${esc(it.title)}</a>` + (it.source ? ` (<i>${esc(it.source)}</i>)` : '');\n  const commentary = it.commentary ? esc(it.commentary) : '<i>(no commentary yet: tap ✏️ Edit)</i>';\n  const body = it.state === 'dropped' ? `<s>${commentary}</s>` : commentary;\n  const why = it.reason && it.state !== 'dropped' ? `\\n\\n<i>Why picked: ${esc(it.reason)}</i>` : '';\n  return `${head}\\n${title}\\n\\n${body}${why}\\n\\n${stateBadge(it)}`.slice(0, TG_LIMIT);\n}\nfunction itemKeyboard(it) {\n  if (it.state === 'dropped') return { inline_keyboard: [[{ text: '↩️ Restore', callback_data: `r:${it.item_id}` }]] };\n  return { inline_keyboard: [\n    [{ text: '✅ Keep', callback_data: `k:${it.item_id}` }, { text: '🔁 Swap', callback_data: `s:${it.item_id}` }],\n    [{ text: '✏️ Edit', callback_data: `e:${it.item_id}` }, { text: '🗑 Drop', callback_data: `d:${it.item_id}` }],\n  ] };\n}\nconst approveKeyboard = (issueId) => ({ inline_keyboard: [[{ text: '📋 Review final draft & approve', callback_data: `a:${issueId}` }]] });\nconst confirmKeyboard = (issueId) => ({ inline_keyboard: [\n  [{ text: '✅ Confirm & schedule send', callback_data: `c:${issueId}` }],\n  [{ text: '↩️ Keep editing', callback_data: `x:${issueId}` }],\n] });\n\nfunction draftWarnings(v, cfg) {\n  const w = [];\n  const min = num(cfg.min_stories, 8), max = num(cfg.max_stories, 10), minT = num(cfg.min_topics, 3);\n  if (v.active_count < min || v.active_count > max) w.push(`${v.active_count} stories (target ${min}–${max})`);\n  if (v.topic_count < minT) w.push(`only ${v.topic_count} topic areas (target ≥${minT})`);\n  if ((v.items || []).some((i) => i.state !== 'dropped' && !i.commentary)) w.push('some stories have no commentary');\n  return w;\n}\nfunction summaryLine(v) {\n  return `${v.active_count} stories · ${v.topic_count} topics · ${v.pending_count} awaiting review · ${v.alternates_left} alternates left`;\n}\nfunction previewChunks(v, cfg) {\n  const iss = v.issue;\n  const live = (v.items || []).filter((i) => i.state !== 'dropped');\n  const parts = [`<b>${esc(cfg.newsletter_name || 'The Dispatch')}: final draft</b>\\n${summaryLine(v)}` +\n    (iss.intro ? `\\n\\n<i>${esc(iss.intro)}</i>` : '\\n\\n<i>(no intro: add one with /intro your text)</i>')];\n  live.forEach((it, idx) => {\n    parts.push(`<b>${idx + 1}. ${esc(it.title)}</b> <i>[${esc(it.topic)}]</i>\\n${esc(it.commentary || '(no commentary)')}`);\n  });\n  if (iss.sponsor && iss.sponsor.text) parts.push(`<b>Sponsor:</b> ${esc(iss.sponsor.text)}${iss.sponsor.url ? ' (' + esc(iss.sponsor.url) + ')' : ''}`);\n  const w = draftWarnings(v, cfg);\n  let tail = `\\nSends to <b>${v.active_subscribers}</b> active subscribers at <b>${istDate(v.send_at)}</b> IST, and only after you tap Confirm.`;\n  if (w.length) tail = `\\n⚠️ ${esc(w.join('; '))}` + tail;\n  parts.push(tail);\n  const chunks = []; let cur = '';\n  for (const p of parts) {\n    if ((cur + '\\n\\n' + p).length > TG_LIMIT && cur) { chunks.push(cur); cur = p; } else cur = cur ? cur + '\\n\\n' + p : p;\n  }\n  if (cur) chunks.push(cur);\n  return chunks.map((c) => c.slice(0, 4090));\n}\nconst HELP = [\n  '<b>The Dispatch bot</b>',\n  'Each story in the weekly draft has buttons:',\n  '✅ Keep · 🔁 Swap (next-best alternate) · ✏️ Edit commentary · 🗑 Drop',\n  '',\n  '📌 Paste any link here during the week and it\\'s guaranteed a spot in the next draft (add a note after the link if you like).',\n  '',\n  '🎙 Or just send a voice note: \"drop 3\", \"swap 5\", \"edit 2: new commentary…\", \"intro …\", \"approve\". I\\'ll show what I heard.',\n  'Typed works too: <b>keep 1</b> · <b>drop 3</b> · <b>swap 5</b> · <b>restore 3</b> · <b>edit 2: new text</b>',\n  '',\n  'Just type a word (no / needed):',\n  '<b>status</b>: draft summary',\n  '<b>alternates</b>: runners-up you can add with one tap',\n  '<b>intro</b> your text: set this week\\'s 2-line opener',\n  '<b>sponsor</b> text | link: add a sponsor block (<b>nosponsor</b> removes it)',\n  '<b>stats</b>: subscribers, opens, clicks, source health',\n  '<b>preview</b>: show the full draft',\n  '<b>approve</b>: review & confirm the final draft',\n  '<b>unapprove</b>: withdraw approval before sending starts',\n  '<b>cancel</b>: cancel an edit in progress',\n  '<b>selftest</b>: check the bot end to end',\n  '<b>testsend</b>: email the current draft to yourself only',\n  '<b>newskey</b> KEY: connect the NewsData.io news API',\n  '<b>read 3</b>: the full article Gemini read for story 3',\n  '<b>voice</b>: your voice guide · <b>voicerule</b> text: add a house rule',\n  '<b>suggestions</b>: links readers sent from the website (<b>take 12</b> / <b>skip 12</b>)',\n  '',\n  'Nothing is ever emailed until you tap <b>Confirm & schedule send</b>.',\n].join('\\n');\n\n// ---- Email rendering ----\nfunction renderEmail(v, cfg, r) {\n  const iss = v.issue;\n  const items = (v.items || []).filter((i) => i.state === 'kept' || i.state === 'proposed');\n  const name = cfg.newsletter_name || 'The Dispatch';\n  const dateStr = istDate(`${iss.week_start}T12:00:00+05:30`, { day: 'numeric', month: 'long', year: 'numeric' });\n  const base = String(cfg.public_base_url || '').replace(/\\/+$/, '');\n  const unsub = `${base}/webhook/dispatch-unsubscribe?t=${encodeURIComponent(r.unsub_token)}`;\n  const site = String(cfg.site_url || '').replace(/\\/+$/, '');\n  const webUrl = site ? `${site}/issue/${encodeURIComponent(iss.issue_no)}` : '';\n  const stories = items.map((it, i) => `\n      <tr><td style=\"padding:22px 0;border-top:1px solid #e6e6e6;\">\n        <div style=\"font:600 11px/1.4 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#b4441b;\">${i + 1} · ${esc(it.topic)}</div>\n        <a href=\"${esc(it.url)}\" style=\"display:block;margin:6px 0 8px;font:700 19px/1.35 Georgia,serif;color:#111;text-decoration:none;\">${esc(it.title)}</a>\n        <div style=\"font:16px/1.6 Georgia,serif;color:#333;\">${esc(it.commentary)}</div>\n        <div style=\"margin-top:8px;font:13px/1.4 Arial,sans-serif;color:#777;\">${esc(it.source || '')} · <a href=\"${esc(it.url)}\" style=\"color:#b4441b;\">Read →</a></div>\n      </td></tr>`).join('');\n  const html = `<!doctype html><html><body style=\"margin:0;background:#f6f4ef;\">\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f6f4ef;\"><tr><td align=\"center\" style=\"padding:24px 12px;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:620px;background:#fff;padding:0 28px;\">\n      <tr><td style=\"padding:28px 0 18px;\">\n        <div style=\"font:700 28px/1.2 Georgia,serif;color:#111;\">${esc(name)}</div>\n        <div style=\"font:13px/1.5 Arial,sans-serif;color:#777;\">Issue #${esc(iss.issue_no)} · ${esc(dateStr)}${cfg.newsletter_tagline ? ' · ' + esc(cfg.newsletter_tagline) : ''}${webUrl ? ` · <a href=\"${esc(webUrl)}\" style=\"color:#777;\">View in browser</a>` : ''}</div>\n      </td></tr>${iss.intro ? `\n      <tr><td style=\"padding:0 0 22px;font:italic 17px/1.6 Georgia,serif;color:#333;\">${esc(iss.intro)}</td></tr>` : ''}${stories}${iss.sponsor && iss.sponsor.text ? `\n      <tr><td style=\"padding:18px;border:1px dashed #d9cfc2;border-radius:8px;background:#fbf8f2;\">\n        <div style=\"font:600 10px/1.4 Arial,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999;\">Sponsored</div>\n        <div style=\"margin-top:6px;font:15px/1.55 Georgia,serif;color:#333;\">${esc(iss.sponsor.text)}${iss.sponsor.url ? ` <a href=\"${esc(iss.sponsor.url)}\" style=\"color:#b4441b;\">Learn more →</a>` : ''}</div>\n      </td></tr>` : ''}\n      <tr><td style=\"padding:22px 0 30px;border-top:1px solid #e6e6e6;font:12px/1.6 Arial,sans-serif;color:#888;\">\n        You're receiving this because you subscribed to ${esc(name)}.<br>\n        <a href=\"${esc(unsub)}\" style=\"color:#888;\">Unsubscribe in one click</a>, or reply with \"unsubscribe\".\n      </td></tr>\n    </table></td></tr></table></body></html>`;\n  const lead = items[0] ? items[0].title : '';\n  const subject = `${name} #${iss.issue_no}: ${lead}`.slice(0, 120);\n  return { subject, html, unsub, webUrl };\n}\n// ---- end shared helpers ----\n\n// Telegram warning for sources that keep failing (max once a day per source)\nconst r = $input.first().json;\nconst bad = r.bad || [];\nif (!bad.length) return [];\nconst cfg = r.cfg;\nconst lines = bad.map((b) => `• <b>${esc(b.name)}</b>: <code>${esc(b.error)}</code>`).join('\\n');\nreturn [{ json: { method: 'sendMessage', body: { chat_id: cfg.telegram_chat_id, parse_mode: 'HTML',\n  text: `⚠️ <b>${bad.length} news source${bad.length > 1 ? 's are' : ' is'} failing</b> (no successful fetch in 36h):\\n${lines}\\n\\nThe pipeline keeps running on the other sources. Fix or switch off the feed in the <code>sources</code> table.` } } }];\n"
+      }
+    },
+    {
+      "id": "e9834acc-6efc-4627-bb52-882fb13a1053",
+      "name": "Alert Shreya",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        -240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Broken feeds').first().json.cfg.telegram_bot_token }}/{{ $json.method }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 350
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Mon–Wed every 4h": {
+      "main": [
+        [
+          {
+            "node": "Load sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Load sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load sources": {
+      "main": [
+        [
+          {
+            "node": "Build feed URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build feed URLs": {
+      "main": [
+        [
+          {
+            "node": "Loop feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop feeds": {
+      "main": [
+        [
+          {
+            "node": "Feed health",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Broken feeds",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "News API?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "News API?": {
+      "main": [
+        [
+          {
+            "node": "Call news API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call news API": {
+      "main": [
+        [
+          {
+            "node": "Normalize items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Broken feeds": {
+      "main": [
+        [
+          {
+            "node": "Build feed alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build feed alert": {
+      "main": [
+        [
+          {
+            "node": "Alert Shreya",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read feed": {
+      "main": [
+        [
+          {
+            "node": "Normalize items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize items": {
+      "main": [
+        [
+          {
+            "node": "Store + dedup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store + dedup": {
+      "main": [
+        [
+          {
+            "node": "Loop feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

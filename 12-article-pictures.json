@@ -1,0 +1,208 @@
+{
+  "name": "Dispatch 12 · Article pictures",
+  "nodes": [
+    {
+      "id": "a6bbe0e7-fb47-4a00-86c9-f1232eeac6b1",
+      "name": "Mon–Thu every 3h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "20 7,10,13,16,19 * * 1-4"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "6d7c02ea-8a54-489c-a26d-1f5a43231d45",
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "9e15b161-00ad-46f3-87bf-aafe9cd1fe09",
+      "name": "Articles without pictures",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, url FROM articles_needing_images(60);",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "592a0ea3-6b46-4746-8b6a-56ecb3e29e07",
+      "name": "Fetch article pages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        100
+      ],
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "en-IN,en;q=0.9"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "batching": {
+            "batch": {
+              "batchSize": 6,
+              "batchInterval": 300
+            }
+          },
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "neverError": true,
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "ea3a0d38-709f-4b2d-ba23-5c302743cf6d",
+      "name": "Find pictures",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Find each article's own picture: the og:image / twitter:image the publisher set for sharing\nconst asked = $('Articles without pictures').all().map((i) => i.json);\nconst pages = $input.all().map((i) => i.json);\nconst meta = (html, prop) => {\n  const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=[\"']${prop}[\"'][^>]*content=[\"']([^\"']+)[\"']`, 'i'))\n    || html.match(new RegExp(`<meta[^>]+content=[\"']([^\"']+)[\"'][^>]*(?:property|name)=[\"']${prop}[\"']`, 'i'));\n  return m ? m[1].replace(/&amp;/g, '&').trim() : '';\n};\nconst out = asked.map((a, i) => {\n  const p = pages[i] || {};\n  const html = typeof p.data === 'string' ? p.data.slice(0, 300000) : '';\n  let img = html ? (meta(html, 'og:image:secure_url') || meta(html, 'og:image') || meta(html, 'twitter:image') || meta(html, 'twitter:image:src')) : '';\n  if (img.startsWith('//')) img = 'https:' + img;\n  else if (img.startsWith('/')) { const host = (String(a.url).match(/^https?:\\/\\/[^/]+/i) || [''])[0]; img = host ? host.replace(/^http:/i, 'https:') + img : ''; }\n  img = img.replace(/^http:\\/\\//i, 'https://');\n  return { id: a.id, image: /^https:\\/\\/\\S+$/i.test(img) ? img : '' };\n});\nreturn [{ json: { b64: Buffer.from(JSON.stringify(out), 'utf8').toString('base64'), found: out.filter((x) => x.image).length, tried: out.length } }];\n"
+      }
+    },
+    {
+      "id": "efaa6d63-3b81-4f71-a41d-f4d791966594",
+      "name": "Save pictures",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        960,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT save_article_images($1) AS r;",
+        "options": {
+          "queryReplacement": "={{ $json.b64 }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Mon–Thu every 3h": {
+      "main": [
+        [
+          {
+            "node": "Articles without pictures",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Articles without pictures",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Articles without pictures": {
+      "main": [
+        [
+          {
+            "node": "Fetch article pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch article pages": {
+      "main": [
+        [
+          {
+            "node": "Find pictures",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find pictures": {
+      "main": [
+        [
+          {
+            "node": "Save pictures",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

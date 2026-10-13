@@ -1,0 +1,302 @@
+{
+  "name": "Dispatch 10 · Self-test (from Telegram)",
+  "nodes": [
+    {
+      "id": "becca251-d985-4d02-83a2-29604232d38b",
+      "name": "Self-test request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "dispatch-selftest-5854172a427a",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "webhookId": "149f1031-1f11-4f89-bca9-1fcee3d5afad"
+    },
+    {
+      "id": "989f43d0-f0c0-4638-a9a3-fc8a68faa7ee",
+      "name": "Load config",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        200,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT d_config_json() AS cfg;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "6a14c6c0-563a-4d8e-b781-9ec1dd2bc857",
+      "name": "Pick a news link",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        400,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT url FROM articles WHERE week_start = d_week_start(d_now()) AND NOT coalesce(pinned,false) AND status = 'new' AND url NOT LIKE '%news.google.com%' ORDER BY fetched_at DESC LIMIT 1;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "fd71399f-c6b8-43d0-b236-e087fae41a3b",
+      "name": "Build test messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Fake Telegram updates from Shreya's chat, posted to the bot's own webhook\nconst cfg = $('Load config').first().json.cfg;\nconst chat = Number(cfg.telegram_chat_id);\nconst link = ($('Pick a news link').first().json.url) || 'https://inc42.com/';\nconst base = Math.floor(Date.now() / 1000);\nconst texts = ['help', 'alternates', 'stats', link + ' self-test (auto-removed)'];\nreturn texts.map((text, i) => {\n  const isCmd = !text.startsWith('http');\n  const first = text.split(' ')[0];\n  return { json: { step: isCmd ? first : 'paste a link', body: {\n    update_id: base * 10 + i,\n    message: {\n      message_id: base * 10 + i, date: base,\n      chat: { id: chat, type: 'private' },\n      from: { id: chat, is_bot: false, first_name: 'Self-test' },\n      text,\n      entities: isCmd ? [] : [{ offset: 0, length: first.length, type: 'url' }],\n    } } } };\n});\n"
+      }
+    },
+    {
+      "id": "a864482e-5c6f-44f9-9fed-d9d94263d548",
+      "name": "Send to bot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://newss.app.n8n.cloud/webhook/4e7c95b4-b915-454a-ba29-dde9fbe75159/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Telegram-Bot-Api-Secret-Token",
+              "value": "ZZithGL5EkozfMME_1f5e0124-6d4f-49da-8d37-07a3db084e01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 6000
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          },
+          "timeout": 20000
+        }
+      }
+    },
+    {
+      "id": "3e6b7810-a507-42cd-aedd-c05aa299a5b9",
+      "name": "Let the bot reply",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1000,
+        100
+      ],
+      "parameters": {
+        "amount": 20
+      },
+      "webhookId": "d4b66902-0651-4a4e-8d79-0ca5430cf1fe"
+    },
+    {
+      "id": "3d24b350-7436-48b6-9a4f-e1eca046446e",
+      "name": "Unpin test link",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1200,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE articles SET pinned = false, pinned_note = null WHERE pinned AND pinned_note ILIKE '%self-test%' RETURNING id;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      },
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "3000fb95-3ce8-4c5e-8ef4-872dad63bb0f",
+      "name": "Build report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Summarise the run and send it to Shreya\nconst cfg = $('Load config').first().json.cfg;\nconst sent = $('Send to bot').all().map((x, i) => ({\n  step: $('Build test messages').all()[i].json.step,\n  ok: String(x.json.statusCode || '').startsWith('2'),\n  code: x.json.statusCode,\n}));\nconst pinned = $('Unpin test link').all().filter((x) => x.json.id).length > 0;\nconst lines = sent.map((s) => `${s.ok ? '✅' : '❌'} ${s.step}${s.ok ? '' : ` (HTTP ${s.code})`}`);\nlines.push(`${pinned ? '✅' : '❌'} pasted link was pinned for the next draft${pinned ? ' (and removed again)' : ''}`);\nconst allOk = sent.every((s) => s.ok) && pinned;\nconst text = `🧪 <b>Self-test ${allOk ? 'passed' : 'found a problem'}</b>\\n\\n${lines.join('\\n')}\\n\\n` +\n  (allOk ? 'Every reply above came from the live bot.' : 'Something did not respond. The error alert, if any, will follow in this chat.');\nreturn [{ json: { method: 'sendMessage', body: { chat_id: cfg.telegram_chat_id, text, parse_mode: 'HTML' } } }];\n"
+      }
+    },
+    {
+      "id": "13b5f5d4-c6d9-48da-ad0d-a853bac46503",
+      "name": "Send report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Load config').first().json.cfg.telegram_bot_token }}/{{ $json.method }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 350
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Self-test request": {
+      "main": [
+        [
+          {
+            "node": "Load config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load config": {
+      "main": [
+        [
+          {
+            "node": "Pick a news link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick a news link": {
+      "main": [
+        [
+          {
+            "node": "Build test messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build test messages": {
+      "main": [
+        [
+          {
+            "node": "Send to bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to bot": {
+      "main": [
+        [
+          {
+            "node": "Let the bot reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Let the bot reply": {
+      "main": [
+        [
+          {
+            "node": "Unpin test link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unpin test link": {
+      "main": [
+        [
+          {
+            "node": "Build report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build report": {
+      "main": [
+        [
+          {
+            "node": "Send report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

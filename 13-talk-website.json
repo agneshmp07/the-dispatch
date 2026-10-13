@@ -1,0 +1,708 @@
+{
+  "name": "Dispatch 13 · Talk (website)",
+  "nodes": [
+    {
+      "id": "9bfb8c77-b2a4-4137-b58e-ea4be7c2e14e",
+      "name": "Talk",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dispatch-talk",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "0e0c31f6-54f3-463a-a2bb-f9ee82a6041f"
+    },
+    {
+      "id": "b2c31bfe-15fd-4f0d-aa8e-9df86c12afbb",
+      "name": "Load config",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        200,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT d_config_json() AS cfg;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "7cac0f15-67d7-450a-81cb-80c3ae9393fc",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Website \"Talk\" page: check the dashboard key, then turn the request into the same\n// update the Telegram bot understands, so the website and Telegram share one brain.\nconst cfg = $('Load config').first().json.cfg;\nlet b = $('Talk').first().json.body;\nif (typeof b === 'string') { try { b = JSON.parse(b); } catch (e) { b = {}; } }\nb = b || {};\nconst key = String(b.key || '');\nif (!cfg.dashboard_key || key.length < 8 || key !== String(cfg.dashboard_key)) return [{ json: { _stop: 'unauthorized' } }];\nconst chat = { id: Number(cfg.telegram_chat_id) || String(cfg.telegram_chat_id), type: 'private' };\nconst now = Math.floor(Date.now() / 1000);\nif (b.callback) {\n  // story buttons from the website; the final \"Confirm & schedule send\" stays Telegram-only\n  const data = String(b.callback).slice(0, 40);\n  if (!/^[kdrsepax]:\\d+$/.test(data)) return [{ json: { _stop: 'bad_button' } }];\n  return [{ json: { update_id: now, callback_query: { id: 'web-' + now, data, message: { message_id: 0, chat } } } }];\n}\nconst text = String(b.text || '').replace(/[\\u0000-\\u0008\\u000b-\\u001f]+/g, ' ').trim().slice(0, 2000);\nconst hasAudio = typeof b.audio === 'string' && b.audio.length > 100;\nif (!text && !hasAudio) return [{ json: { _stop: 'empty' } }];\nconst msg = { message_id: now, date: now, chat, from: { id: chat.id, is_bot: false, first_name: 'Shreya (website)' }, text };\nif (b.reply) msg.reply_to_message = { message_id: 0, from: { is_bot: true } };   // answering the bot's \"edit\" prompt\nif (hasAudio) msg.voice = { file_id: 'web', mime_type: 'audio/wav' };\nreturn [{ json: Object.assign({ update_id: now, message: msg }, hasAudio ? { _audio: true } : {}) }];\n"
+      }
+    },
+    {
+      "id": "5c795cc7-6cd8-4218-9687-a736122153a6",
+      "name": "Allowed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        600,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "7550ba40-bb8b-4439-b94b-0ccb29c277cf",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              },
+              "leftValue": "={{ !!$json._stop }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "bb335e51-c0c6-4509-b11d-1b3b3e51d16d",
+      "name": "Refuse",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        300
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseCode": 401,
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json._stop }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "d02d37fe-c58f-4598-856f-675d556d3447",
+      "name": "Voice?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        800,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "e19cb463-e170-4165-bfa0-cd397d152ac4",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ !!$json._audio }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "192bbb4e-9c30-4a2e-8e70-3af6756b8378",
+      "name": "Voice request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        260
+      ],
+      "parameters": {
+        "jsCode": "// Website microphone: the page records a short WAV; Gemini transcribes it and maps it to a command\nconst cfg = $('Load config').first().json.cfg;\nlet b = $('Talk').first().json.body;\nif (typeof b === 'string') { try { b = JSON.parse(b); } catch (e) { b = {}; } }\nconst audio = String((b && b.audio) || '').replace(/^data:[^,]*,/, '');\nif (!/^[A-Za-z0-9+/=]+$/.test(audio) || audio.length > 4000000) return [{ json: { skip: true } }];\nconst prompt = [\n  'You are the voice interface of a newsletter assistant that helps an editor review her weekly draft.',\n  'Transcribe the recording faithfully in English (it may mix English and Hindi; write Hindi words in English letters).',\n  'Then map it to ONE assistant command, or return an empty command if it is dictated text or a question rather than a command.',\n  'Allowed commands (output exactly this form):',\n  '  keep N | drop N | swap N | restore N | edit N | edit N: <new commentary exactly as spoken> | read N',\n  '  status | preview | alternates | stats | approve | unapprove | cancel | nosponsor | help | voice | suggestions | take N | skip N',\n  '  intro <text> | sponsor <text> | voicerule <rule> | <link if spoken>',\n  'N is the story or suggestion number. Spoken numbers like \"third\" or \"number three\" become 3.',\n  'Never invent a command that was not clearly asked for. If unsure, return an empty command.',\n  'Examples: \"drop the third one\" -> \"drop 3\"; \"what did Gemini read for story two\" -> \"read 2\";',\n  '\"any reader suggestions?\" -> \"suggestions\"; \"add a rule: never call a valuation a win\" -> \"voicerule never call a valuation a win\";',\n  '\"okay looks good, approve it\" -> \"approve\"; \"set the intro to quiet week for funding\" -> \"intro Quiet week for funding.\"',\n].join('\\n');\nreturn [{ json: {\n  model: cfg.gemini_model_write || cfg.gemini_model_select || 'gemini-3.8-flash',\n  request: {\n    contents: [{ role: 'user', parts: [{ text: prompt }, { inline_data: { mime_type: 'audio/wav', data: audio } }] }],\n    generationConfig: { temperature: 0, responseMimeType: 'application/json',\n      responseSchema: { type: 'OBJECT', properties: { transcript: { type: 'STRING' }, command: { type: 'STRING' } }, required: ['transcript', 'command'] } },\n  },\n} }];\n"
+      }
+    },
+    {
+      "id": "c0f75c44-a68e-4b47-be72-a2dacc244098",
+      "name": "Transcribe voice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        260
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $json.model }}:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $('Load config').first().json.cfg.gemini_api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "860b94f8-8990-412e-85fa-d5326e73e20a",
+      "name": "Voice text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        260
+      ],
+      "parameters": {
+        "jsCode": "// ---- shared helpers (prepended to every Code node by build.js) ----\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst toB64 = (o) => {\n  const s = JSON.stringify(o);\n  if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');\n  return btoa(String.fromCharCode(...new TextEncoder().encode(s)));\n};\nconst istDate = (d, opts) => new Date(d).toLocaleString('en-IN', Object.assign({ timeZone: 'Asia/Kolkata' }, opts || { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }));\nconst cfgList = (v) => String(v || '').split('|').map((x) => x.trim()).filter(Boolean);\nconst num = (v, d) => (Number.isFinite(Number(v)) && String(v) !== '' ? Number(v) : d);\n\nfunction geminiJson(resp) {\n  const parts = resp?.candidates?.[0]?.content?.parts || [];\n  let txt = parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n  if (!txt) throw new Error('Gemini returned no text: ' + JSON.stringify(resp).slice(0, 600));\n  txt = txt.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '');\n  try { return JSON.parse(txt); } catch (e) {\n    const m = txt.match(/\\{[\\s\\S]*\\}/);\n    if (m) return JSON.parse(m[0]);\n    throw new Error('Gemini returned invalid JSON: ' + txt.slice(0, 400));\n  }\n}\n\n// ---- Telegram rendering ----\nconst TG_LIMIT = 3900;\nfunction stateBadge(it) {\n  if (it.state === 'kept') return it.edited ? '✏️ Edited & kept' : '✅ Kept';\n  if (it.state === 'dropped') return '🗑 Dropped';\n  return '⏳ Awaiting review';\n}\nfunction renderItem(it) {\n  const head = `<b>#${it.position} · ${esc(it.topic)}</b>`;\n  const title = `<a href=\"${esc(it.url)}\">${esc(it.title)}</a>` + (it.source ? ` (<i>${esc(it.source)}</i>)` : '');\n  const commentary = it.commentary ? esc(it.commentary) : '<i>(no commentary yet: tap ✏️ Edit)</i>';\n  const body = it.state === 'dropped' ? `<s>${commentary}</s>` : commentary;\n  const why = it.reason && it.state !== 'dropped' ? `\\n\\n<i>Why picked: ${esc(it.reason)}</i>` : '';\n  return `${head}\\n${title}\\n\\n${body}${why}\\n\\n${stateBadge(it)}`.slice(0, TG_LIMIT);\n}\nfunction itemKeyboard(it) {\n  if (it.state === 'dropped') return { inline_keyboard: [[{ text: '↩️ Restore', callback_data: `r:${it.item_id}` }]] };\n  return { inline_keyboard: [\n    [{ text: '✅ Keep', callback_data: `k:${it.item_id}` }, { text: '🔁 Swap', callback_data: `s:${it.item_id}` }],\n    [{ text: '✏️ Edit', callback_data: `e:${it.item_id}` }, { text: '🗑 Drop', callback_data: `d:${it.item_id}` }],\n  ] };\n}\nconst approveKeyboard = (issueId) => ({ inline_keyboard: [[{ text: '📋 Review final draft & approve', callback_data: `a:${issueId}` }]] });\nconst confirmKeyboard = (issueId) => ({ inline_keyboard: [\n  [{ text: '✅ Confirm & schedule send', callback_data: `c:${issueId}` }],\n  [{ text: '↩️ Keep editing', callback_data: `x:${issueId}` }],\n] });\n\nfunction draftWarnings(v, cfg) {\n  const w = [];\n  const min = num(cfg.min_stories, 8), max = num(cfg.max_stories, 10), minT = num(cfg.min_topics, 3);\n  if (v.active_count < min || v.active_count > max) w.push(`${v.active_count} stories (target ${min}–${max})`);\n  if (v.topic_count < minT) w.push(`only ${v.topic_count} topic areas (target ≥${minT})`);\n  if ((v.items || []).some((i) => i.state !== 'dropped' && !i.commentary)) w.push('some stories have no commentary');\n  return w;\n}\nfunction summaryLine(v) {\n  return `${v.active_count} stories · ${v.topic_count} topics · ${v.pending_count} awaiting review · ${v.alternates_left} alternates left`;\n}\nfunction previewChunks(v, cfg) {\n  const iss = v.issue;\n  const live = (v.items || []).filter((i) => i.state !== 'dropped');\n  const parts = [`<b>${esc(cfg.newsletter_name || 'The Dispatch')}: final draft</b>\\n${summaryLine(v)}` +\n    (iss.intro ? `\\n\\n<i>${esc(iss.intro)}</i>` : '\\n\\n<i>(no intro: add one with /intro your text)</i>')];\n  live.forEach((it, idx) => {\n    parts.push(`<b>${idx + 1}. ${esc(it.title)}</b> <i>[${esc(it.topic)}]</i>\\n${esc(it.commentary || '(no commentary)')}`);\n  });\n  if (iss.sponsor && iss.sponsor.text) parts.push(`<b>Sponsor:</b> ${esc(iss.sponsor.text)}${iss.sponsor.url ? ' (' + esc(iss.sponsor.url) + ')' : ''}`);\n  const w = draftWarnings(v, cfg);\n  let tail = `\\nSends to <b>${v.active_subscribers}</b> active subscribers at <b>${istDate(v.send_at)}</b> IST, and only after you tap Confirm.`;\n  if (w.length) tail = `\\n⚠️ ${esc(w.join('; '))}` + tail;\n  parts.push(tail);\n  const chunks = []; let cur = '';\n  for (const p of parts) {\n    if ((cur + '\\n\\n' + p).length > TG_LIMIT && cur) { chunks.push(cur); cur = p; } else cur = cur ? cur + '\\n\\n' + p : p;\n  }\n  if (cur) chunks.push(cur);\n  return chunks.map((c) => c.slice(0, 4090));\n}\nconst HELP = [\n  '<b>The Dispatch bot</b>',\n  'Each story in the weekly draft has buttons:',\n  '✅ Keep · 🔁 Swap (next-best alternate) · ✏️ Edit commentary · 🗑 Drop',\n  '',\n  '📌 Paste any link here during the week and it\\'s guaranteed a spot in the next draft (add a note after the link if you like).',\n  '',\n  '🎙 Or just send a voice note: \"drop 3\", \"swap 5\", \"edit 2: new commentary…\", \"intro …\", \"approve\". I\\'ll show what I heard.',\n  'Typed works too: <b>keep 1</b> · <b>drop 3</b> · <b>swap 5</b> · <b>restore 3</b> · <b>edit 2: new text</b>',\n  '',\n  'Just type a word (no / needed):',\n  '<b>status</b>: draft summary',\n  '<b>alternates</b>: runners-up you can add with one tap',\n  '<b>intro</b> your text: set this week\\'s 2-line opener',\n  '<b>sponsor</b> text | link: add a sponsor block (<b>nosponsor</b> removes it)',\n  '<b>stats</b>: subscribers, opens, clicks, source health',\n  '<b>preview</b>: show the full draft',\n  '<b>approve</b>: review & confirm the final draft',\n  '<b>unapprove</b>: withdraw approval before sending starts',\n  '<b>cancel</b>: cancel an edit in progress',\n  '<b>selftest</b>: check the bot end to end',\n  '<b>testsend</b>: email the current draft to yourself only',\n  '<b>newskey</b> KEY: connect the NewsData.io news API',\n  '<b>read 3</b>: the full article Gemini read for story 3',\n  '<b>voice</b>: your voice guide · <b>voicerule</b> text: add a house rule',\n  '<b>suggestions</b>: links readers sent from the website (<b>take 12</b> / <b>skip 12</b>)',\n  '',\n  'Nothing is ever emailed until you tap <b>Confirm & schedule send</b>.',\n].join('\\n');\n\n// ---- Email rendering ----\nfunction renderEmail(v, cfg, r) {\n  const iss = v.issue;\n  const items = (v.items || []).filter((i) => i.state === 'kept' || i.state === 'proposed');\n  const name = cfg.newsletter_name || 'The Dispatch';\n  const dateStr = istDate(`${iss.week_start}T12:00:00+05:30`, { day: 'numeric', month: 'long', year: 'numeric' });\n  const base = String(cfg.public_base_url || '').replace(/\\/+$/, '');\n  const unsub = `${base}/webhook/dispatch-unsubscribe?t=${encodeURIComponent(r.unsub_token)}`;\n  const site = String(cfg.site_url || '').replace(/\\/+$/, '');\n  const webUrl = site ? `${site}/issue/${encodeURIComponent(iss.issue_no)}` : '';\n  const stories = items.map((it, i) => `\n      <tr><td style=\"padding:22px 0;border-top:1px solid #e6e6e6;\">\n        <div style=\"font:600 11px/1.4 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#b4441b;\">${i + 1} · ${esc(it.topic)}</div>\n        <a href=\"${esc(it.url)}\" style=\"display:block;margin:6px 0 8px;font:700 19px/1.35 Georgia,serif;color:#111;text-decoration:none;\">${esc(it.title)}</a>\n        <div style=\"font:16px/1.6 Georgia,serif;color:#333;\">${esc(it.commentary)}</div>\n        <div style=\"margin-top:8px;font:13px/1.4 Arial,sans-serif;color:#777;\">${esc(it.source || '')} · <a href=\"${esc(it.url)}\" style=\"color:#b4441b;\">Read →</a></div>\n      </td></tr>`).join('');\n  const html = `<!doctype html><html><body style=\"margin:0;background:#f6f4ef;\">\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f6f4ef;\"><tr><td align=\"center\" style=\"padding:24px 12px;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:620px;background:#fff;padding:0 28px;\">\n      <tr><td style=\"padding:28px 0 18px;\">\n        <div style=\"font:700 28px/1.2 Georgia,serif;color:#111;\">${esc(name)}</div>\n        <div style=\"font:13px/1.5 Arial,sans-serif;color:#777;\">Issue #${esc(iss.issue_no)} · ${esc(dateStr)}${cfg.newsletter_tagline ? ' · ' + esc(cfg.newsletter_tagline) : ''}${webUrl ? ` · <a href=\"${esc(webUrl)}\" style=\"color:#777;\">View in browser</a>` : ''}</div>\n      </td></tr>${iss.intro ? `\n      <tr><td style=\"padding:0 0 22px;font:italic 17px/1.6 Georgia,serif;color:#333;\">${esc(iss.intro)}</td></tr>` : ''}${stories}${iss.sponsor && iss.sponsor.text ? `\n      <tr><td style=\"padding:18px;border:1px dashed #d9cfc2;border-radius:8px;background:#fbf8f2;\">\n        <div style=\"font:600 10px/1.4 Arial,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999;\">Sponsored</div>\n        <div style=\"margin-top:6px;font:15px/1.55 Georgia,serif;color:#333;\">${esc(iss.sponsor.text)}${iss.sponsor.url ? ` <a href=\"${esc(iss.sponsor.url)}\" style=\"color:#b4441b;\">Learn more →</a>` : ''}</div>\n      </td></tr>` : ''}\n      <tr><td style=\"padding:22px 0 30px;border-top:1px solid #e6e6e6;font:12px/1.6 Arial,sans-serif;color:#888;\">\n        You're receiving this because you subscribed to ${esc(name)}.<br>\n        <a href=\"${esc(unsub)}\" style=\"color:#888;\">Unsubscribe in one click</a>, or reply with \"unsubscribe\".\n      </td></tr>\n    </table></td></tr></table></body></html>`;\n  const lead = items[0] ? items[0].title : '';\n  const subject = `${name} #${iss.issue_no}: ${lead}`.slice(0, 120);\n  return { subject, html, unsub, webUrl };\n}\n// ---- end shared helpers ----\n\n// Parse Gemini's transcription; on any failure, report it instead of guessing\nlet out = { transcript: '', command: '', failed: true };\ntry {\n  const j = geminiJson($input.first().json);\n  out = { transcript: String(j.transcript || '').trim().slice(0, 1500), command: String(j.command || '').trim().slice(0, 1500), failed: false };\n  if (!out.transcript) out.failed = true;\n} catch (e) { out.error = String(e.message || e).slice(0, 200); }\nreturn [{ json: out }];\n"
+      }
+    },
+    {
+      "id": "54cf9011-6192-4fd3-8bb7-d8cceba5c330",
+      "name": "Decide action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// ---- shared helpers (prepended to every Code node by build.js) ----\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst toB64 = (o) => {\n  const s = JSON.stringify(o);\n  if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');\n  return btoa(String.fromCharCode(...new TextEncoder().encode(s)));\n};\nconst istDate = (d, opts) => new Date(d).toLocaleString('en-IN', Object.assign({ timeZone: 'Asia/Kolkata' }, opts || { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }));\nconst cfgList = (v) => String(v || '').split('|').map((x) => x.trim()).filter(Boolean);\nconst num = (v, d) => (Number.isFinite(Number(v)) && String(v) !== '' ? Number(v) : d);\n\nfunction geminiJson(resp) {\n  const parts = resp?.candidates?.[0]?.content?.parts || [];\n  let txt = parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n  if (!txt) throw new Error('Gemini returned no text: ' + JSON.stringify(resp).slice(0, 600));\n  txt = txt.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '');\n  try { return JSON.parse(txt); } catch (e) {\n    const m = txt.match(/\\{[\\s\\S]*\\}/);\n    if (m) return JSON.parse(m[0]);\n    throw new Error('Gemini returned invalid JSON: ' + txt.slice(0, 400));\n  }\n}\n\n// ---- Telegram rendering ----\nconst TG_LIMIT = 3900;\nfunction stateBadge(it) {\n  if (it.state === 'kept') return it.edited ? '✏️ Edited & kept' : '✅ Kept';\n  if (it.state === 'dropped') return '🗑 Dropped';\n  return '⏳ Awaiting review';\n}\nfunction renderItem(it) {\n  const head = `<b>#${it.position} · ${esc(it.topic)}</b>`;\n  const title = `<a href=\"${esc(it.url)}\">${esc(it.title)}</a>` + (it.source ? ` (<i>${esc(it.source)}</i>)` : '');\n  const commentary = it.commentary ? esc(it.commentary) : '<i>(no commentary yet: tap ✏️ Edit)</i>';\n  const body = it.state === 'dropped' ? `<s>${commentary}</s>` : commentary;\n  const why = it.reason && it.state !== 'dropped' ? `\\n\\n<i>Why picked: ${esc(it.reason)}</i>` : '';\n  return `${head}\\n${title}\\n\\n${body}${why}\\n\\n${stateBadge(it)}`.slice(0, TG_LIMIT);\n}\nfunction itemKeyboard(it) {\n  if (it.state === 'dropped') return { inline_keyboard: [[{ text: '↩️ Restore', callback_data: `r:${it.item_id}` }]] };\n  return { inline_keyboard: [\n    [{ text: '✅ Keep', callback_data: `k:${it.item_id}` }, { text: '🔁 Swap', callback_data: `s:${it.item_id}` }],\n    [{ text: '✏️ Edit', callback_data: `e:${it.item_id}` }, { text: '🗑 Drop', callback_data: `d:${it.item_id}` }],\n  ] };\n}\nconst approveKeyboard = (issueId) => ({ inline_keyboard: [[{ text: '📋 Review final draft & approve', callback_data: `a:${issueId}` }]] });\nconst confirmKeyboard = (issueId) => ({ inline_keyboard: [\n  [{ text: '✅ Confirm & schedule send', callback_data: `c:${issueId}` }],\n  [{ text: '↩️ Keep editing', callback_data: `x:${issueId}` }],\n] });\n\nfunction draftWarnings(v, cfg) {\n  const w = [];\n  const min = num(cfg.min_stories, 8), max = num(cfg.max_stories, 10), minT = num(cfg.min_topics, 3);\n  if (v.active_count < min || v.active_count > max) w.push(`${v.active_count} stories (target ${min}–${max})`);\n  if (v.topic_count < minT) w.push(`only ${v.topic_count} topic areas (target ≥${minT})`);\n  if ((v.items || []).some((i) => i.state !== 'dropped' && !i.commentary)) w.push('some stories have no commentary');\n  return w;\n}\nfunction summaryLine(v) {\n  return `${v.active_count} stories · ${v.topic_count} topics · ${v.pending_count} awaiting review · ${v.alternates_left} alternates left`;\n}\nfunction previewChunks(v, cfg) {\n  const iss = v.issue;\n  const live = (v.items || []).filter((i) => i.state !== 'dropped');\n  const parts = [`<b>${esc(cfg.newsletter_name || 'The Dispatch')}: final draft</b>\\n${summaryLine(v)}` +\n    (iss.intro ? `\\n\\n<i>${esc(iss.intro)}</i>` : '\\n\\n<i>(no intro: add one with /intro your text)</i>')];\n  live.forEach((it, idx) => {\n    parts.push(`<b>${idx + 1}. ${esc(it.title)}</b> <i>[${esc(it.topic)}]</i>\\n${esc(it.commentary || '(no commentary)')}`);\n  });\n  if (iss.sponsor && iss.sponsor.text) parts.push(`<b>Sponsor:</b> ${esc(iss.sponsor.text)}${iss.sponsor.url ? ' (' + esc(iss.sponsor.url) + ')' : ''}`);\n  const w = draftWarnings(v, cfg);\n  let tail = `\\nSends to <b>${v.active_subscribers}</b> active subscribers at <b>${istDate(v.send_at)}</b> IST, and only after you tap Confirm.`;\n  if (w.length) tail = `\\n⚠️ ${esc(w.join('; '))}` + tail;\n  parts.push(tail);\n  const chunks = []; let cur = '';\n  for (const p of parts) {\n    if ((cur + '\\n\\n' + p).length > TG_LIMIT && cur) { chunks.push(cur); cur = p; } else cur = cur ? cur + '\\n\\n' + p : p;\n  }\n  if (cur) chunks.push(cur);\n  return chunks.map((c) => c.slice(0, 4090));\n}\nconst HELP = [\n  '<b>The Dispatch bot</b>',\n  'Each story in the weekly draft has buttons:',\n  '✅ Keep · 🔁 Swap (next-best alternate) · ✏️ Edit commentary · 🗑 Drop',\n  '',\n  '📌 Paste any link here during the week and it\\'s guaranteed a spot in the next draft (add a note after the link if you like).',\n  '',\n  '🎙 Or just send a voice note: \"drop 3\", \"swap 5\", \"edit 2: new commentary…\", \"intro …\", \"approve\". I\\'ll show what I heard.',\n  'Typed works too: <b>keep 1</b> · <b>drop 3</b> · <b>swap 5</b> · <b>restore 3</b> · <b>edit 2: new text</b>',\n  '',\n  'Just type a word (no / needed):',\n  '<b>status</b>: draft summary',\n  '<b>alternates</b>: runners-up you can add with one tap',\n  '<b>intro</b> your text: set this week\\'s 2-line opener',\n  '<b>sponsor</b> text | link: add a sponsor block (<b>nosponsor</b> removes it)',\n  '<b>stats</b>: subscribers, opens, clicks, source health',\n  '<b>preview</b>: show the full draft',\n  '<b>approve</b>: review & confirm the final draft',\n  '<b>unapprove</b>: withdraw approval before sending starts',\n  '<b>cancel</b>: cancel an edit in progress',\n  '<b>selftest</b>: check the bot end to end',\n  '<b>testsend</b>: email the current draft to yourself only',\n  '<b>newskey</b> KEY: connect the NewsData.io news API',\n  '<b>read 3</b>: the full article Gemini read for story 3',\n  '<b>voice</b>: your voice guide · <b>voicerule</b> text: add a house rule',\n  '<b>suggestions</b>: links readers sent from the website (<b>take 12</b> / <b>skip 12</b>)',\n  '',\n  'Nothing is ever emailed until you tap <b>Confirm & schedule send</b>.',\n].join('\\n');\n\n// ---- Email rendering ----\nfunction renderEmail(v, cfg, r) {\n  const iss = v.issue;\n  const items = (v.items || []).filter((i) => i.state === 'kept' || i.state === 'proposed');\n  const name = cfg.newsletter_name || 'The Dispatch';\n  const dateStr = istDate(`${iss.week_start}T12:00:00+05:30`, { day: 'numeric', month: 'long', year: 'numeric' });\n  const base = String(cfg.public_base_url || '').replace(/\\/+$/, '');\n  const unsub = `${base}/webhook/dispatch-unsubscribe?t=${encodeURIComponent(r.unsub_token)}`;\n  const site = String(cfg.site_url || '').replace(/\\/+$/, '');\n  const webUrl = site ? `${site}/issue/${encodeURIComponent(iss.issue_no)}` : '';\n  const stories = items.map((it, i) => `\n      <tr><td style=\"padding:22px 0;border-top:1px solid #e6e6e6;\">\n        <div style=\"font:600 11px/1.4 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#b4441b;\">${i + 1} · ${esc(it.topic)}</div>\n        <a href=\"${esc(it.url)}\" style=\"display:block;margin:6px 0 8px;font:700 19px/1.35 Georgia,serif;color:#111;text-decoration:none;\">${esc(it.title)}</a>\n        <div style=\"font:16px/1.6 Georgia,serif;color:#333;\">${esc(it.commentary)}</div>\n        <div style=\"margin-top:8px;font:13px/1.4 Arial,sans-serif;color:#777;\">${esc(it.source || '')} · <a href=\"${esc(it.url)}\" style=\"color:#b4441b;\">Read →</a></div>\n      </td></tr>`).join('');\n  const html = `<!doctype html><html><body style=\"margin:0;background:#f6f4ef;\">\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f6f4ef;\"><tr><td align=\"center\" style=\"padding:24px 12px;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:620px;background:#fff;padding:0 28px;\">\n      <tr><td style=\"padding:28px 0 18px;\">\n        <div style=\"font:700 28px/1.2 Georgia,serif;color:#111;\">${esc(name)}</div>\n        <div style=\"font:13px/1.5 Arial,sans-serif;color:#777;\">Issue #${esc(iss.issue_no)} · ${esc(dateStr)}${cfg.newsletter_tagline ? ' · ' + esc(cfg.newsletter_tagline) : ''}${webUrl ? ` · <a href=\"${esc(webUrl)}\" style=\"color:#777;\">View in browser</a>` : ''}</div>\n      </td></tr>${iss.intro ? `\n      <tr><td style=\"padding:0 0 22px;font:italic 17px/1.6 Georgia,serif;color:#333;\">${esc(iss.intro)}</td></tr>` : ''}${stories}${iss.sponsor && iss.sponsor.text ? `\n      <tr><td style=\"padding:18px;border:1px dashed #d9cfc2;border-radius:8px;background:#fbf8f2;\">\n        <div style=\"font:600 10px/1.4 Arial,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999;\">Sponsored</div>\n        <div style=\"margin-top:6px;font:15px/1.55 Georgia,serif;color:#333;\">${esc(iss.sponsor.text)}${iss.sponsor.url ? ` <a href=\"${esc(iss.sponsor.url)}\" style=\"color:#b4441b;\">Learn more →</a>` : ''}</div>\n      </td></tr>` : ''}\n      <tr><td style=\"padding:22px 0 30px;border-top:1px solid #e6e6e6;font:12px/1.6 Arial,sans-serif;color:#888;\">\n        You're receiving this because you subscribed to ${esc(name)}.<br>\n        <a href=\"${esc(unsub)}\" style=\"color:#888;\">Unsubscribe in one click</a>, or reply with \"unsubscribe\".\n      </td></tr>\n    </table></td></tr></table></body></html>`;\n  const lead = items[0] ? items[0].title : '';\n  const subject = `${name} #${iss.issue_no}: ${lead}`.slice(0, 120);\n  return { subject, html, unsub, webUrl };\n}\n// ---- end shared helpers ----\n\n// Parse the Telegram update into a review action (only Shreya's chat is obeyed)\nconst cfg = $('Load config').first().json.cfg;\nconst u = $('Telegram Trigger').first().json;\nconst cq = u.callback_query;\nconst msg = u.message || u.edited_message;\nconst chat_id = String(cq ? cq.message?.chat?.id : msg?.chat?.id ?? '');\nif (!chat_id) return [];\nconst ctx = { chat_id, callback_id: cq ? cq.id : null, message_id: cq ? cq.message?.message_id : null, unauthorized: false, help: false, command: null };\nlet action = { type: 'noop', chat_id };\nconst URL_RE = /https?:\\/\\/[^\\s<>\"']+/i;\n\nif (chat_id !== String(cfg.telegram_chat_id || '').trim()) {\n  ctx.unauthorized = true;\n} else if (cq) {\n  const [code, idStr] = String(cq.data || '').split(':');\n  const id = parseInt(idStr, 10);\n  const itemTypes = { k: 'keep', d: 'drop', r: 'restore', s: 'swap', e: 'edit_start', p: 'add_alt' };\n  const issueTypes = { a: 'request_approve', c: 'confirm', x: 'cancel' };\n  if (itemTypes[code]) action = { type: itemTypes[code], chat_id, item_id: id };\n  else if (issueTypes[code]) action = { type: issueTypes[code], chat_id, issue_id: id };\n} else if (msg) {\n  // forwarded posts and captions count as text too\n  let text = String(msg.text || msg.caption || '').trim();\n  // voice notes: Gemini's transcript (and its normalised command) stand in for typed text\n  let voice = null;\n  try { voice = $('Voice text').first().json; } catch (e) { voice = null; }\n  if (voice) {\n    ctx.voice = voice.transcript || '';\n    if (voice.failed || !voice.transcript) ctx.voice_failed = true;\n    text = msg.reply_to_message ? String(voice.transcript || '').trim() : String(voice.command || voice.transcript || '').trim();\n  }\n  // Commands work with or without the \"/\": \"stats\", \"Stats\", \"self test\", \"intro Big week for fintech\"\n  // (not when replying to the bot's edit prompt, so commentary is never mistaken for a command)\n  if (!text.startsWith('/') && !msg.reply_to_message) {\n    const words = text.toLowerCase().replace(/[.!?]+$/, '').split(/\\s+/);\n    const bare = { help: 1, start: 1, status: 1, preview: 1, draft: 1, approve: 1, unapprove: 1, cancel: 1, alternates: 1,\n      more: 1, stats: 1, nosponsor: 1, selftest: 1, test: 1, cleardemo: 1, testsend: 1, sendtest: 1, testemail: 1, voice: 1, myvoice: 1, voiceguide: 1, suggestions: 1, readersuggestions: 1 };\n    const joined = words.join('');\n    if (words.length <= 2 && bare[joined]) text = '/' + joined;                       // \"stats\", \"self test\", \"no sponsor\"\n    else if (['intro', 'sponsor', 'suggest', 'newskey', 'voicerule'].includes(words[0].replace(/:$/, '')) && words.length > 1)\n      text = '/' + text.replace(/^(\\w+):?/, (m, w) => w.toLowerCase());               // \"intro: ...\", \"Sponsor ... | link\"\n  }\n  if (!msg.reply_to_message) text = text.replace(/^\\/?voice\\s+rule\\b:?/i, '/voicerule');        // \"voice rule: …\"\n  const ent = [...(msg.entities || []), ...(msg.caption_entities || [])].find((e) => e.type === 'text_link' && e.url);\n  const num = !msg.reply_to_message && text.match(/^\\/?(keep|drop|remove|delete|swap|replace|restore|undo|edit)\\s*(?:story\\s*)?(?:#|no\\.?|number\\s*)?(\\d{1,2})\\b\\s*[:.,-]?\\s*([\\s\\S]*)$/i);\n  const one = !msg.reply_to_message && text.match(/^\\/?(read|take|skip)\\s*(?:story\\s*|suggestion\\s*)?(?:#|no\\.?\\s*)?(\\d{1,5})\\s*$/i);\n  if (ctx.voice_failed) {\n    // nothing usable was heard\n  } else if (one) {\n    const t = { read: 'read_story', take: 'take_suggestion', skip: 'skip_suggestion' }[one[1].toLowerCase()];\n    action = { type: t, chat_id, n: parseInt(one[2], 10) };\n  } else if (num) {\n    const verbs = { keep: 'keep', drop: 'drop', remove: 'drop', delete: 'drop', swap: 'swap', replace: 'swap', restore: 'restore', undo: 'restore', edit: 'edit_start' };\n    let type = verbs[num[1].toLowerCase()];\n    const rest = (num[3] || '').trim();\n    if (type === 'edit_start' && rest.length >= 10) type = 'edit_with_text';\n    action = { type, chat_id, position: parseInt(num[2], 10), text: type === 'edit_with_text' ? rest : undefined };\n  } else if (text.startsWith('/')) {\n    const cmd = text.split(/[\\s@]/)[0].slice(1).toLowerCase();\n    const rest = text.replace(/^\\/\\S+\\s*/, '').trim();\n    ctx.command = cmd;\n    const simple = { status: 'status', preview: 'preview', draft: 'preview', approve: 'request_approve', unapprove: 'unapprove',\n      cancel: 'cancel', alternates: 'alternates', more: 'alternates', stats: 'stats', nosponsor: 'nosponsor', cleardemo: 'clear_demo',\n      voice: 'voice_show', myvoice: 'voice_show', voiceguide: 'voice_show', suggestions: 'suggestions', readersuggestions: 'suggestions' };\n    if (simple[cmd]) action = { type: simple[cmd], chat_id };\n    else if (cmd === 'selftest' || cmd === 'test') ctx.selftest = true;   // handled by the Self-test workflow\n    else if (['testsend', 'sendtest', 'testemail'].includes(cmd)) ctx.testsend = true;   // handled by the Test send workflow\n    else if (cmd === 'newskey' && rest) { action = { type: 'set_news_key', chat_id, key: rest.split(/\\s+/)[0] }; ctx.user_msg_id = msg.message_id; }\n    else if (cmd === 'intro' && rest) action = { type: 'set_intro', chat_id, text: rest };\n    else if (cmd === 'voicerule') action = { type: 'voice_rule', chat_id, text: rest };\n    else if (cmd === 'sponsor' && rest) {\n      const [t, link] = rest.split('|').map((x) => x.trim());\n      action = { type: 'sponsor', chat_id, text: t, url: (link && URL_RE.test(link)) ? link.match(URL_RE)[0] : ((t.match(URL_RE) || [])[0] || null) };\n    } else if (cmd === 'suggest' && URL_RE.test(rest)) {\n      const url = rest.match(URL_RE)[0];\n      action = { type: 'suggest', chat_id, url, note: rest.replace(url, '').trim() };\n    } else ctx.help = true;                       // /start, /help, unknown, empty /intro\n  } else if (text || ent) {\n    const m = text.match(URL_RE);\n    const url = m ? m[0] : (ent ? ent.url : null);\n    action = { type: 'text', chat_id, text, url: url ? url.replace(/[).,]+$/, '') : null, note: url ? text.replace(m ? m[0] : '', '').trim().slice(0, 300) : null };\n  }\n}\n// links get their title/description fetched before saving\nconst fetch_url = (action.url && (action.type === 'text' || action.type === 'suggest')) ? action.url : 'about:blank';\nreturn [{ json: { action, ctx, fetch_url } }];\n"
+      }
+    },
+    {
+      "id": "9970101d-4d66-4b8d-96c1-d4cbcd658c59",
+      "name": "Fetch link",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1800,
+        100
+      ],
+      "parameters": {
+        "url": "={{ $json.fetch_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 8000,
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "neverError": true,
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "f5f47187-ed10-4282-8118-86f1c9f06bf6",
+      "name": "Page info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Merge the fetched page's title/description into the action, then encode it\nconst d = $('Decide action').first().json;\nconst action = Object.assign({}, d.action);\nconst page = $input.first().json || {};\nconst html = typeof page.data === 'string' ? page.data.slice(0, 200000) : '';\nconst ENT = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '\"', '&#39;': \"'\", '&rsquo;': \"'\", '&lsquo;': \"'\", '&ldquo;': '\"', '&rdquo;': '\"', '&nbsp;': ' ', '&#x27;': \"'\", '&ndash;': '-', '&mdash;': '-' };\nconst dec = (s) => String(s || '').replace(/&[#a-z0-9]+;/gi, (m) => ENT[m.toLowerCase()] || (/^&#\\d+;$/.test(m) ? String.fromCharCode(+m.slice(2, -1)) : ' ')).replace(/\\s+/g, ' ').trim();\nconst meta = (prop) => {\n  const re = new RegExp(`<meta[^>]+(?:property|name)=[\"']${prop}[\"'][^>]*content=[\"']([^\"']*)[\"']|<meta[^>]+content=[\"']([^\"']*)[\"'][^>]*(?:property|name)=[\"']${prop}[\"']`, 'i');\n  const m = html.match(re); return m ? dec(m[1] || m[2]) : '';\n};\nif (action.url && html) {\n  const t = meta('og:title') || meta('twitter:title') || dec((html.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i) || [])[1]);\n  action.title = t.replace(/\\s+[|\\-–—]\\s+[^|\\-–—]{2,40}$/, '').slice(0, 300) || null;\n  action.summary = (meta('og:description') || meta('description')).slice(0, 1000) || null;\n  action.site = meta('og:site_name') || null;\n}\nif (action.url) {\n  try { const x = new URL(action.url); x.hash = ''; x.hostname = x.hostname.replace(/^www\\./, '');\n    for (const k of [...x.searchParams.keys()]) if (/^(utm_|fbclid$|gclid$|ref$|igshid$|mc_)/i.test(k)) x.searchParams.delete(k);\n    action.canon = x.toString().replace(/\\/$/, ''); } catch (e) {}\n}\nconst toB64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nreturn [{ json: { action, ctx: d.ctx, b64: toB64(action) } }];\n"
+      }
+    },
+    {
+      "id": "7485009a-e450-4fea-ab84-fd4241cd1d71",
+      "name": "Apply action",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2200,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT review_apply_more($1) AS r;",
+        "options": {
+          "queryReplacement": "={{ $json.b64 }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "72100d57-6e43-40da-b260-4c5be7555a6d",
+      "name": "Render replies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// ---- shared helpers (prepended to every Code node by build.js) ----\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst toB64 = (o) => {\n  const s = JSON.stringify(o);\n  if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');\n  return btoa(String.fromCharCode(...new TextEncoder().encode(s)));\n};\nconst istDate = (d, opts) => new Date(d).toLocaleString('en-IN', Object.assign({ timeZone: 'Asia/Kolkata' }, opts || { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }));\nconst cfgList = (v) => String(v || '').split('|').map((x) => x.trim()).filter(Boolean);\nconst num = (v, d) => (Number.isFinite(Number(v)) && String(v) !== '' ? Number(v) : d);\n\nfunction geminiJson(resp) {\n  const parts = resp?.candidates?.[0]?.content?.parts || [];\n  let txt = parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n  if (!txt) throw new Error('Gemini returned no text: ' + JSON.stringify(resp).slice(0, 600));\n  txt = txt.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '');\n  try { return JSON.parse(txt); } catch (e) {\n    const m = txt.match(/\\{[\\s\\S]*\\}/);\n    if (m) return JSON.parse(m[0]);\n    throw new Error('Gemini returned invalid JSON: ' + txt.slice(0, 400));\n  }\n}\n\n// ---- Telegram rendering ----\nconst TG_LIMIT = 3900;\nfunction stateBadge(it) {\n  if (it.state === 'kept') return it.edited ? '✏️ Edited & kept' : '✅ Kept';\n  if (it.state === 'dropped') return '🗑 Dropped';\n  return '⏳ Awaiting review';\n}\nfunction renderItem(it) {\n  const head = `<b>#${it.position} · ${esc(it.topic)}</b>`;\n  const title = `<a href=\"${esc(it.url)}\">${esc(it.title)}</a>` + (it.source ? ` (<i>${esc(it.source)}</i>)` : '');\n  const commentary = it.commentary ? esc(it.commentary) : '<i>(no commentary yet: tap ✏️ Edit)</i>';\n  const body = it.state === 'dropped' ? `<s>${commentary}</s>` : commentary;\n  const why = it.reason && it.state !== 'dropped' ? `\\n\\n<i>Why picked: ${esc(it.reason)}</i>` : '';\n  return `${head}\\n${title}\\n\\n${body}${why}\\n\\n${stateBadge(it)}`.slice(0, TG_LIMIT);\n}\nfunction itemKeyboard(it) {\n  if (it.state === 'dropped') return { inline_keyboard: [[{ text: '↩️ Restore', callback_data: `r:${it.item_id}` }]] };\n  return { inline_keyboard: [\n    [{ text: '✅ Keep', callback_data: `k:${it.item_id}` }, { text: '🔁 Swap', callback_data: `s:${it.item_id}` }],\n    [{ text: '✏️ Edit', callback_data: `e:${it.item_id}` }, { text: '🗑 Drop', callback_data: `d:${it.item_id}` }],\n  ] };\n}\nconst approveKeyboard = (issueId) => ({ inline_keyboard: [[{ text: '📋 Review final draft & approve', callback_data: `a:${issueId}` }]] });\nconst confirmKeyboard = (issueId) => ({ inline_keyboard: [\n  [{ text: '✅ Confirm & schedule send', callback_data: `c:${issueId}` }],\n  [{ text: '↩️ Keep editing', callback_data: `x:${issueId}` }],\n] });\n\nfunction draftWarnings(v, cfg) {\n  const w = [];\n  const min = num(cfg.min_stories, 8), max = num(cfg.max_stories, 10), minT = num(cfg.min_topics, 3);\n  if (v.active_count < min || v.active_count > max) w.push(`${v.active_count} stories (target ${min}–${max})`);\n  if (v.topic_count < minT) w.push(`only ${v.topic_count} topic areas (target ≥${minT})`);\n  if ((v.items || []).some((i) => i.state !== 'dropped' && !i.commentary)) w.push('some stories have no commentary');\n  return w;\n}\nfunction summaryLine(v) {\n  return `${v.active_count} stories · ${v.topic_count} topics · ${v.pending_count} awaiting review · ${v.alternates_left} alternates left`;\n}\nfunction previewChunks(v, cfg) {\n  const iss = v.issue;\n  const live = (v.items || []).filter((i) => i.state !== 'dropped');\n  const parts = [`<b>${esc(cfg.newsletter_name || 'The Dispatch')}: final draft</b>\\n${summaryLine(v)}` +\n    (iss.intro ? `\\n\\n<i>${esc(iss.intro)}</i>` : '\\n\\n<i>(no intro: add one with /intro your text)</i>')];\n  live.forEach((it, idx) => {\n    parts.push(`<b>${idx + 1}. ${esc(it.title)}</b> <i>[${esc(it.topic)}]</i>\\n${esc(it.commentary || '(no commentary)')}`);\n  });\n  if (iss.sponsor && iss.sponsor.text) parts.push(`<b>Sponsor:</b> ${esc(iss.sponsor.text)}${iss.sponsor.url ? ' (' + esc(iss.sponsor.url) + ')' : ''}`);\n  const w = draftWarnings(v, cfg);\n  let tail = `\\nSends to <b>${v.active_subscribers}</b> active subscribers at <b>${istDate(v.send_at)}</b> IST, and only after you tap Confirm.`;\n  if (w.length) tail = `\\n⚠️ ${esc(w.join('; '))}` + tail;\n  parts.push(tail);\n  const chunks = []; let cur = '';\n  for (const p of parts) {\n    if ((cur + '\\n\\n' + p).length > TG_LIMIT && cur) { chunks.push(cur); cur = p; } else cur = cur ? cur + '\\n\\n' + p : p;\n  }\n  if (cur) chunks.push(cur);\n  return chunks.map((c) => c.slice(0, 4090));\n}\nconst HELP = [\n  '<b>The Dispatch bot</b>',\n  'Each story in the weekly draft has buttons:',\n  '✅ Keep · 🔁 Swap (next-best alternate) · ✏️ Edit commentary · 🗑 Drop',\n  '',\n  '📌 Paste any link here during the week and it\\'s guaranteed a spot in the next draft (add a note after the link if you like).',\n  '',\n  '🎙 Or just send a voice note: \"drop 3\", \"swap 5\", \"edit 2: new commentary…\", \"intro …\", \"approve\". I\\'ll show what I heard.',\n  'Typed works too: <b>keep 1</b> · <b>drop 3</b> · <b>swap 5</b> · <b>restore 3</b> · <b>edit 2: new text</b>',\n  '',\n  'Just type a word (no / needed):',\n  '<b>status</b>: draft summary',\n  '<b>alternates</b>: runners-up you can add with one tap',\n  '<b>intro</b> your text: set this week\\'s 2-line opener',\n  '<b>sponsor</b> text | link: add a sponsor block (<b>nosponsor</b> removes it)',\n  '<b>stats</b>: subscribers, opens, clicks, source health',\n  '<b>preview</b>: show the full draft',\n  '<b>approve</b>: review & confirm the final draft',\n  '<b>unapprove</b>: withdraw approval before sending starts',\n  '<b>cancel</b>: cancel an edit in progress',\n  '<b>selftest</b>: check the bot end to end',\n  '<b>testsend</b>: email the current draft to yourself only',\n  '<b>newskey</b> KEY: connect the NewsData.io news API',\n  '<b>read 3</b>: the full article Gemini read for story 3',\n  '<b>voice</b>: your voice guide · <b>voicerule</b> text: add a house rule',\n  '<b>suggestions</b>: links readers sent from the website (<b>take 12</b> / <b>skip 12</b>)',\n  '',\n  'Nothing is ever emailed until you tap <b>Confirm & schedule send</b>.',\n].join('\\n');\n\n// ---- Email rendering ----\nfunction renderEmail(v, cfg, r) {\n  const iss = v.issue;\n  const items = (v.items || []).filter((i) => i.state === 'kept' || i.state === 'proposed');\n  const name = cfg.newsletter_name || 'The Dispatch';\n  const dateStr = istDate(`${iss.week_start}T12:00:00+05:30`, { day: 'numeric', month: 'long', year: 'numeric' });\n  const base = String(cfg.public_base_url || '').replace(/\\/+$/, '');\n  const unsub = `${base}/webhook/dispatch-unsubscribe?t=${encodeURIComponent(r.unsub_token)}`;\n  const site = String(cfg.site_url || '').replace(/\\/+$/, '');\n  const webUrl = site ? `${site}/issue/${encodeURIComponent(iss.issue_no)}` : '';\n  const stories = items.map((it, i) => `\n      <tr><td style=\"padding:22px 0;border-top:1px solid #e6e6e6;\">\n        <div style=\"font:600 11px/1.4 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#b4441b;\">${i + 1} · ${esc(it.topic)}</div>\n        <a href=\"${esc(it.url)}\" style=\"display:block;margin:6px 0 8px;font:700 19px/1.35 Georgia,serif;color:#111;text-decoration:none;\">${esc(it.title)}</a>\n        <div style=\"font:16px/1.6 Georgia,serif;color:#333;\">${esc(it.commentary)}</div>\n        <div style=\"margin-top:8px;font:13px/1.4 Arial,sans-serif;color:#777;\">${esc(it.source || '')} · <a href=\"${esc(it.url)}\" style=\"color:#b4441b;\">Read →</a></div>\n      </td></tr>`).join('');\n  const html = `<!doctype html><html><body style=\"margin:0;background:#f6f4ef;\">\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f6f4ef;\"><tr><td align=\"center\" style=\"padding:24px 12px;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:620px;background:#fff;padding:0 28px;\">\n      <tr><td style=\"padding:28px 0 18px;\">\n        <div style=\"font:700 28px/1.2 Georgia,serif;color:#111;\">${esc(name)}</div>\n        <div style=\"font:13px/1.5 Arial,sans-serif;color:#777;\">Issue #${esc(iss.issue_no)} · ${esc(dateStr)}${cfg.newsletter_tagline ? ' · ' + esc(cfg.newsletter_tagline) : ''}${webUrl ? ` · <a href=\"${esc(webUrl)}\" style=\"color:#777;\">View in browser</a>` : ''}</div>\n      </td></tr>${iss.intro ? `\n      <tr><td style=\"padding:0 0 22px;font:italic 17px/1.6 Georgia,serif;color:#333;\">${esc(iss.intro)}</td></tr>` : ''}${stories}${iss.sponsor && iss.sponsor.text ? `\n      <tr><td style=\"padding:18px;border:1px dashed #d9cfc2;border-radius:8px;background:#fbf8f2;\">\n        <div style=\"font:600 10px/1.4 Arial,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999;\">Sponsored</div>\n        <div style=\"margin-top:6px;font:15px/1.55 Georgia,serif;color:#333;\">${esc(iss.sponsor.text)}${iss.sponsor.url ? ` <a href=\"${esc(iss.sponsor.url)}\" style=\"color:#b4441b;\">Learn more →</a>` : ''}</div>\n      </td></tr>` : ''}\n      <tr><td style=\"padding:22px 0 30px;border-top:1px solid #e6e6e6;font:12px/1.6 Arial,sans-serif;color:#888;\">\n        You're receiving this because you subscribed to ${esc(name)}.<br>\n        <a href=\"${esc(unsub)}\" style=\"color:#888;\">Unsubscribe in one click</a>, or reply with \"unsubscribe\".\n      </td></tr>\n    </table></td></tr></table></body></html>`;\n  const lead = items[0] ? items[0].title : '';\n  const subject = `${name} #${iss.issue_no}: ${lead}`.slice(0, 120);\n  return { subject, html, unsub, webUrl };\n}\n// ---- end shared helpers ----\n\n// Turn the DB result into Telegram API calls\nconst r = $input.first().json.r;\nconst { ctx } = $('Decide action').first().json;\nconst cfg = $('Load config').first().json.cfg;\nconst chat_id = ctx.chat_id;\nconst calls = [];\nconst send = (text, extra) => calls.push({ method: 'sendMessage', body: Object.assign({ chat_id, text, parse_mode: 'HTML', link_preview_options: { is_disabled: true } }, extra || {}) });\nconst editItem = (it) => {\n  const message_id = it.telegram_msg_id || ctx.message_id;\n  if (!message_id) return;\n  calls.push({ method: 'editMessageText', body: { chat_id, message_id, text: renderItem(it), parse_mode: 'HTML', link_preview_options: { is_disabled: true }, reply_markup: itemKeyboard(it) } });\n};\nconst clearButtons = () => ctx.message_id && calls.push({ method: 'editMessageReplyMarkup', body: { chat_id, message_id: ctx.message_id, reply_markup: { inline_keyboard: [] } } });\n\nif (ctx.callback_id) {\n  calls.push({ method: 'answerCallbackQuery', body: { callback_query_id: ctx.callback_id, text: String(r.message || (r.ok ? 'Done' : 'Not possible')).slice(0, 190), show_alert: !r.ok } });\n}\n\nif (ctx.user_msg_id && !ctx.unauthorized) {             // never leave an API key sitting in the chat\n  calls.push({ method: 'deleteMessage', body: { chat_id, message_id: ctx.user_msg_id } });\n}\nif (ctx.voice !== undefined && !ctx.unauthorized) {\n  send(ctx.voice_failed\n    ? '🎙 Sorry, I couldn\\'t make that out. Try again a little slower, or type it.'\n    : `🎙 <i>I heard:</i> “${esc(ctx.voice)}”`);\n}\nif (ctx.unauthorized) {\n  send(`This is a private bot. Your chat ID is <code>${esc(chat_id)}</code>.`);\n} else if (ctx.testsend) {\n  send('📧 Sending a test copy of the current draft to your own inbox (not to subscribers). It arrives in about a minute.');\n} else if (ctx.selftest) {\n  send('🧪 <b>Self-test started.</b> In the next ~40 seconds I\\'ll send myself help, alternates, stats and a news link, and you\\'ll see each reply here. A report follows at the end. The test link is unpinned afterwards.');\n} else if (ctx.help) {\n  send(HELP);\n} else if (!r.ok) {\n  if (!ctx.callback_id) send(esc(r.message || 'Something went wrong.'));\n} else {\n  const v = r.view;\n  switch (r.type) {\n    case 'keep': case 'drop': case 'restore': case 'swap':\n      if (r.item) editItem(r.item);\n      if (r.type === 'swap' && v.alternates_left === 0) send('ℹ️ That was the last alternate for this week.');\n      break;\n    case 'edit_start': {\n      const it = r.item;\n      send(`✏️ Editing <b>#${it.position}</b>: ${esc(it.title)}\\n\\nCurrent commentary:\\n<code>${esc(it.commentary || '')}</code>\\n\\nReply with the replacement text (tap the code above to copy it), or /cancel.`,\n        { reply_markup: { force_reply: true, input_field_placeholder: 'New commentary…' } });\n      break;\n    }\n    case 'edit_text':\n      if (r.item) editItem(r.item);\n      send(`✅ ${esc(r.message)}\\n${summaryLine(v)}`);\n      break;\n    case 'request_approve': {\n      const chunks = previewChunks(v, cfg);\n      chunks.forEach((c, i) => send(c, i === chunks.length - 1 ? { reply_markup: confirmKeyboard(v.issue.id) } : {}));\n      break;\n    }\n    case 'confirm':\n      clearButtons();\n      send(`✅ <b>Approved: Issue #${esc(v.issue.issue_no)}</b>\\n${r.queued} subscribers queued. Sending starts <b>${istDate(v.send_at)}</b> IST.\\nChanged your mind? Send /unapprove before then.`);\n      break;\n    case 'cancel':\n      if (ctx.callback_id) clearButtons(); else send('Cancelled.');\n      break;\n    case 'unapprove':\n      send(esc(r.message));\n      break;\n    case 'status':\n      send(`<b>Issue status:</b> ${esc(v.issue.status)}${v.issue.issue_no ? ' (#' + esc(v.issue.issue_no) + ')' : ''}\\n${summaryLine(v)}\\nActive subscribers: ${v.active_subscribers}\\nSend time: ${istDate(v.send_at)} IST` +\n        (v.issue.status === 'in_review' ? '\\n\\nSend /approve when ready.' : ''));\n      break;\n    case 'preview':\n      previewChunks(v, cfg).forEach((c) => send(c));\n      break;\n    case 'text':\n    case 'suggest':\n      if (r.type === 'suggest' || r.title) {\n        send(`📌 <b>Saved for the next draft</b>\\n${esc(r.title || '')}\\n\\nIt's guaranteed a place among Wednesday's stories (${esc(r.pinned_count || 1)} pick${r.pinned_count > 1 ? 's' : ''} so far). Add a note after the link next time and Gemini will use it.`);\n      } else if (r.item) { editItem(r.item); send(`✅ ${esc(r.message)}\\n${summaryLine(v)}`); }\n      break;\n    case 'read_story': {\n      const body = r.full_text || r.summary || '';\n      send(`📖 <b>#${esc(r.position)} ${esc(r.title)}</b>\\n<i>${esc(r.source || '')}</i>\\n\\n` +\n        (r.full_text ? esc(body.slice(0, 3200)) + (body.length > 3200 ? '…' : '') + '\\n\\n<i>This is the text Gemini read before writing the commentary.</i>'\n                     : (body ? esc(body.slice(0, 1500)) + '\\n\\n' : '') + '<i>The full article couldn\\'t be read (paywall or blocked), so Gemini worked from the summary.</i>') +\n        `\\n\\n<a href=\"${esc(r.url)}\">Open the article</a>`);\n      break;\n    }\n    case 'suggestions': {\n      const list = r.list || [];\n      if (!list.length) { send('📮 No new reader suggestions. They come in from the “Suggest a story” form on the website.'); break; }\n      send(`📮 <b>Reader suggestions</b> (${list.length})\\n\\n` + list.map((s) =>\n        `<b>#${s.id}</b> <a href=\"${esc(s.url)}\">${esc(s.title || s.url)}</a>${s.name ? ` <i>from ${esc(s.name)}</i>` : ''}${s.note ? `\\n   “${esc(s.note)}”` : ''}`).join('\\n\\n') +\n        `\\n\\nType <b>take ${list[0].id}</b> to add one to the next draft, or <b>skip ${list[0].id}</b> to dismiss it.`);\n      break;\n    }\n    case 'take_suggestion':\n      send(`📌 <b>Reader suggestion #${esc(r.id)} added</b>\\n${esc(r.title || '')}\\n\\nIt's guaranteed a place in the next draft.`);\n      break;\n    case 'skip_suggestion':\n      send(`Skipped suggestion #${esc(r.id)}. ${r.left ? `${r.left} still waiting (send <b>suggestions</b>).` : 'None left.'}`);\n      break;\n    case 'voice_show': {\n      const rules = r.rules || [];\n      send(`🗣 <b>Shreya's voice</b>\\n` + (r.stance ? `\\n${esc(String(r.stance).replace(/\\*\\*/g, '').replace(/\\s*\\n\\s+/g, ' ').slice(0, 1400))}\\n` : '') +\n        `\\nEdits Gemini has learned from: <b>${esc(r.edits || 0)}</b>` + (r.edit_rate != null ? ` · you edit ${esc(r.edit_rate)}% of stories` : '') +\n        (rules.length ? `\\n\\n<b>Your house rules</b>\\n${rules.map((x, i) => `${i + 1}. ${esc(x)}`).join('\\n')}` : '') +\n        `\\n\\nAdd a rule: <b>voicerule</b> never call a valuation an achievement\\nFull guide: ${esc(String(cfg.site_url || 'https://the-dispatch-india.vercel.app').replace(/\\/$/, ''))}/dashboard?p=voice`);\n      break;\n    }\n    case 'voice_rule':\n      send(`✅ House rule #${esc(r.rules)} added to the voice guide:\\n<i>${esc(r.rule)}</i>\\n\\nGemini uses it from the next draft.`);\n      break;\n    case 'set_intro':\n      send(`✅ Intro updated:\\n<i>${esc(v.issue.intro || '')}</i>`);\n      break;\n    case 'sponsor':\n      send(`✅ Sponsor block added:\\n${esc(v.issue.sponsor && v.issue.sponsor.text)}${v.issue.sponsor && v.issue.sponsor.url ? '\\n' + esc(v.issue.sponsor.url) : ''}\\nRemove with /nosponsor.`);\n      break;\n    case 'nosponsor':\n      send('Sponsor block removed.');\n      break;\n    case 'alternates': {\n      const alts = r.alternates || [];\n      if (!alts.length) { send('No runners-up left for this draft.'); break; }\n      const lines = alts.map((a, i) => `<b>${i + 1}.</b> ${esc(a.title)} <i>[${esc(a.topic)}]</i>${a.reason ? '\\n   ' + esc(a.reason) : ''}`);\n      send(`<b>Runners-up</b> (tap to add one to the draft):\\n\\n${lines.join('\\n\\n')}`.slice(0, 4000),\n        { reply_markup: { inline_keyboard: alts.slice(0, 10).map((a, i) => [{ text: `➕ ${i + 1}. ${a.title}`.slice(0, 60), callback_data: `p:${a.item_id}` }]) } });\n      break;\n    }\n    case 'add_alt':\n      if (ctx.message_id) calls.push({ method: 'editMessageReplyMarkup', body: { chat_id, message_id: ctx.message_id, reply_markup: { inline_keyboard: [] } } });\n      if (r.item) calls.push({ method: 'sendMessage', body: { chat_id, text: renderItem(r.item), parse_mode: 'HTML', link_preview_options: { is_disabled: true }, reply_markup: itemKeyboard(r.item) } });\n      send(summaryLine(v));\n      break;\n    case 'set_news_key':\n      send(`🔑 News API key saved (${esc(r.masked)}) and your message deleted. ${r.sources} news API source${r.sources === 1 ? '' : 's'} will be read from the next ingestion run.`);\n      break;\n    case 'clear_demo': {\n      const c = r.cleared || {};\n      send(c.subscribers || c.issues ? `🧹 Demo data removed: ${c.subscribers} fake subscribers, ${c.issues} fake issues, ${c.events} fake email events. Stats now show only real data.` : 'There was no demo data to remove.');\n      break;\n    }\n    case 'stats': {\n      const s = r.stats || {}; const sub = s.subscribers || {}; const last = (s.issues || []).slice(-1)[0];\n      const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : 'n/a');\n      const bad = (s.sources || []).filter((x) => !x.ok).map((x) => x.name);\n      send(`<b>📊 The Dispatch: stats</b>\\nActive subscribers: <b>${sub.active || 0}</b> (+${sub.new_7d || 0} this week, ${sub.web_signups || 0} from the website)\\nUnsubscribed: ${sub.unsubscribed || 0} · Bounced: ${sub.bounced || 0}` +\n        (last ? `\\n\\n<b>Last issue #${esc(last.issue_no)}</b>\\nSent ${last.sent} · Opened ${last.opened} (${pct(last.opened, last.delivered || last.sent)}) · Clicked ${last.clicked} (${pct(last.clicked, last.delivered || last.sent)})` : '') +\n        `\\n\\nArticles collected this week: ${s.articles_this_week || 0}` + (bad.length ? `\\n⚠️ Broken sources: ${esc(bad.join(', '))}` : '\\nAll sources healthy ✅'));\n      break;\n    }\n  }\n}\nreturn calls.map((c) => ({ json: c }));\n"
+      }
+    },
+    {
+      "id": "cbcb492a-8a58-4e71-af02-ffd6bd60e3e4",
+      "name": "Website reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Turn the bot's Telegram calls into a chat reply for the website\nconst calls = $input.all().map((i) => i.json);\nconst d = $('Decide action').first().json;\nconst replies = [];\nlet expectReply = false;\nfor (const c of calls) {\n  const b = c.body || {};\n  if (c.method === 'sendMessage' || c.method === 'editMessageText') {\n    if (!b.text) continue;\n    const kb = (b.reply_markup && b.reply_markup.inline_keyboard) || [];\n    // buttons the website can press (everything except the final send confirmation)\n    const buttons = kb.flat().filter((x) => x.callback_data && /^[kdrsepax]:\\d+$/.test(x.callback_data)).map((x) => ({ text: x.text, data: x.callback_data }));\n    const confirmInTelegram = kb.flat().some((x) => /^c:/.test(x.callback_data || ''));\n    if (b.reply_markup && b.reply_markup.force_reply) expectReply = true;\n    replies.push({ html: b.text, buttons, confirmInTelegram });\n  } else if (c.method === 'answerCallbackQuery' && b.text && !calls.some((x) => x.method === 'sendMessage')) {\n    replies.push({ html: String(b.text).replace(/[&<>]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])), buttons: [] });\n  }\n}\nlet heard = null;\ntry { const v = $('Voice text').first().json; heard = v.failed ? '' : (v.transcript || ''); } catch (e) { heard = null; }\nreturn [{ json: { ok: true, heard, expectReply, replies: replies.slice(0, 20), action: d.action && d.action.type } }];\n"
+      }
+    },
+    {
+      "id": "f8b047e4-3796-4385-b96d-13ef8af4954c",
+      "name": "Reply",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2800,
+        0
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ddf086e5-766b-41cb-a498-d54d20f62ab0",
+      "name": "Telegram edits",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        200
+      ],
+      "parameters": {
+        "jsCode": "// Keep Shreya's Telegram cards in step with what she did on the website (edits only, no new messages)\nreturn $input.all().map((i) => i.json)\n  .filter((c) => (c.method === 'editMessageText' || c.method === 'editMessageReplyMarkup') && c.body && c.body.message_id)\n  .map((c) => ({ json: c }));\n"
+      }
+    },
+    {
+      "id": "a79b879d-734a-41cd-8ca3-a840fc853d83",
+      "name": "Update Telegram cards",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2800,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Load config').first().json.cfg.telegram_bot_token }}/{{ $json.method }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 350
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "f93fb5af-06b6-4d9a-b50e-423f03b0940d",
+      "name": "Is self-test?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        -120
+      ],
+      "parameters": {
+        "jsCode": "// Pass through only when Shreya sent /selftest; everything else stops here\nconst { ctx } = $('Decide action').first().json;\nreturn ctx && ctx.selftest && !ctx.unauthorized ? [{ json: { go: true } }] : [];\n"
+      }
+    },
+    {
+      "id": "e12a50dd-a647-46ed-b099-a14c94b0f708",
+      "name": "Start self-test",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        -120
+      ],
+      "parameters": {
+        "url": "=https://newss.app.n8n.cloud/webhook/dispatch-selftest",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c7af67d8-be8d-4fc6-af7b-656c28d82d1a",
+      "name": "Is test send?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        -280
+      ],
+      "parameters": {
+        "jsCode": "// Pass through only when Shreya asked for a test send\nconst { ctx } = $('Decide action').first().json;\nreturn ctx && ctx.testsend && !ctx.unauthorized ? [{ json: { go: true } }] : [];\n"
+      }
+    },
+    {
+      "id": "91c5bf54-b986-422f-9689-f5b24faa0d71",
+      "name": "Start test send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        -280
+      ],
+      "parameters": {
+        "url": "=https://newss.app.n8n.cloud/webhook/dispatch-testsend",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Talk": {
+      "main": [
+        [
+          {
+            "node": "Load config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load config": {
+      "main": [
+        [
+          {
+            "node": "Telegram Trigger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Allowed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Allowed?": {
+      "main": [
+        [
+          {
+            "node": "Voice?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Refuse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice?": {
+      "main": [
+        [
+          {
+            "node": "Voice request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Decide action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice request": {
+      "main": [
+        [
+          {
+            "node": "Transcribe voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe voice": {
+      "main": [
+        [
+          {
+            "node": "Voice text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Voice text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice text": {
+      "main": [
+        [
+          {
+            "node": "Decide action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide action": {
+      "main": [
+        [
+          {
+            "node": "Fetch link",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is self-test?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is test send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is self-test?": {
+      "main": [
+        [
+          {
+            "node": "Start self-test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is test send?": {
+      "main": [
+        [
+          {
+            "node": "Start test send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch link": {
+      "main": [
+        [
+          {
+            "node": "Page info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page info": {
+      "main": [
+        [
+          {
+            "node": "Apply action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply action": {
+      "main": [
+        [
+          {
+            "node": "Render replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render replies": {
+      "main": [
+        [
+          {
+            "node": "Website reply",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram edits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Website reply": {
+      "main": [
+        [
+          {
+            "node": "Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram edits": {
+      "main": [
+        [
+          {
+            "node": "Update Telegram cards",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

@@ -1,0 +1,869 @@
+{
+  "name": "Dispatch 7 · Website (sign-up + archive)",
+  "nodes": [
+    {
+      "id": "f4324dcf-3b99-4188-9254-9ac03bec0c6b",
+      "name": "Sign-up",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dispatch-subscribe",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "9deaa651-d83e-4168-ab31-4cb880ffe27a"
+    },
+    {
+      "id": "a7f07632-2205-4f0f-919c-0d6807c9ca8a",
+      "name": "Parse sign-up",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const toB64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64');\nlet b = $input.first().json.body;\nif (typeof b === 'string') { try { b = JSON.parse(b); } catch (e) { b = {}; } }\nb = b || {};\nreturn [{ json: { b64: toB64({ email: String(b.email || '').slice(0, 200), name: String(b.name || '').slice(0, 80), source: String(b.source || 'site').slice(0, 30) }) } }];"
+      }
+    },
+    {
+      "id": "a43663df-309e-4527-87c1-05cad9eabbe8",
+      "name": "Save subscriber",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT web_subscribe($1) AS r;",
+        "options": {
+          "queryReplacement": "={{ $json.b64 }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "f91d9c2d-e436-4487-9dc6-461cc7d1e0b5",
+      "name": "Reply sign-up",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify($json.r) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "3d5f334d-230e-4537-ab12-ae2c0f03ab05",
+      "name": "Stats",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        480
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "dispatch-stats",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "ffa09db2-4438-4cae-85b0-e3d3d64a633d"
+    },
+    {
+      "id": "cf821453-df40-4444-97aa-bd677cbf0af5",
+      "name": "Load stats",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        480
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT CASE WHEN $1 <> 'none' AND $1 = d_cfg('dashboard_key', '') THEN stats_json() ELSE jsonb_build_object('error', 'unauthorized') END AS r;",
+        "options": {
+          "queryReplacement": "={{ String($json.query.key || '').replace(/[^A-Za-z0-9_-]/g, '') || 'none' }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "b7ccca2d-53f9-4aaf-af63-af1dd9985a87",
+      "name": "Reply stats",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        480
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify($json.r) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "ca939353-e08a-4f45-b162-75db42cda407",
+      "name": "Archive",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "dispatch-archive",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "343c0fb0-a752-4ca7-bb7b-a5c05a26709b"
+    },
+    {
+      "id": "55996604-e46e-47a5-b502-0ad4498e9e28",
+      "name": "Load archive",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        240
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT web_archive(12) AS r;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "4b30574b-06b3-4a32-9390-46a7f95c155b",
+      "name": "Reply archive",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        240
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify($json.r) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "f2ecf62d-b94c-47a1-9709-4c3be8e06429",
+      "name": "Issue page",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        720
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "dispatch-issue",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "45d5b2a1-52c0-4b36-966b-e7b835d86ab1"
+    },
+    {
+      "id": "bcdc8311-9dc4-4f78-a34e-8186e7ae9e03",
+      "name": "Load issue",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        720
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT web_issue($1::int) AS r;",
+        "options": {
+          "queryReplacement": "={{ parseInt(String($json.query.n || '').replace(/[^0-9]/g, ''), 10) || 0 }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "dbeb019c-d3b7-40e0-aff6-99dbd841e957",
+      "name": "Reply issue",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        720
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify($json.r) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "533dc87c-da2b-477b-ad38-07ced5f99f0d",
+      "name": "Pipeline",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        960
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "dispatch-pipeline",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "b8d9d2f5-4316-4726-88b1-6fd470856794"
+    },
+    {
+      "id": "a260e389-c3d7-4632-8a34-18b20832210f",
+      "name": "Load pipeline",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        960
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT CASE WHEN $1 <> 'none' AND $1 = d_cfg('dashboard_key', '') THEN pipeline_json() ELSE jsonb_build_object('error', 'unauthorized') END AS r;",
+        "options": {
+          "queryReplacement": "={{ String($json.query.key || '').replace(/[^A-Za-z0-9_-]/g, '') || 'none' }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "de3e4e74-55fc-41a4-8e0c-62fd6a1c71c7",
+      "name": "Reply pipeline",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        960
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify($json.r) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "08ed56b5-09fe-4b01-8b91-fd198f91502b",
+      "name": "News",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1440
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "dispatch-news",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "d1aeef1d-4e4e-4686-a2f9-27d13e699d8c"
+    },
+    {
+      "id": "39bf0b16-3e02-4dc5-bce0-eb1556df5d71",
+      "name": "Load news",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        1440
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT jsonb_build_object('updated', now(), 'week_count', (SELECT count(*) FROM articles WHERE week_start = d_week_start(d_now()) AND status <> 'duplicate' AND NOT coalesce(demo, false)), 'items', coalesce((SELECT jsonb_agg(jsonb_build_object('title', s.title, 'url', s.url, 'source', s.source_name, 'image', s.image_url, 'at', s.fetched_at) ORDER BY s.rk) FROM (SELECT a.*, row_number() OVER (ORDER BY a.week_start DESC, (a.image_url IS NOT NULL) DESC, a.fetched_at DESC) AS rk FROM articles a WHERE a.week_start >= d_week_start(d_now()) - 7 AND a.status <> 'duplicate' AND NOT coalesce(a.demo, false) AND length(a.title) > 12 ORDER BY rk LIMIT 24) s), '[]'::jsonb)) AS r;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "f07ae980-9f75-4a3a-bb73-6c52ca6ab8a8",
+      "name": "Reply news",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        1440
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify($json.r) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "04ef8b35-4371-4546-8fe5-13c1090dba15",
+      "name": "Suggest a story",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1200
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dispatch-suggest",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "c3d18d02-e45d-4372-ba0d-ccc5b5d77e0c"
+    },
+    {
+      "id": "0002252f-177a-49b5-a91f-5b343b76417f",
+      "name": "Check suggestion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        1200
+      ],
+      "parameters": {
+        "jsCode": "// Reader suggestion from the website form: tidy the input and decide whether the link is safe to fetch\nlet b = $input.first().json.body;\nif (typeof b === 'string') { try { b = JSON.parse(b); } catch (e) { b = {}; } }\nb = b || {};\nconst clip = (v, n) => String(v == null ? '' : v).replace(/[\\u0000-\\u001f]+/g, ' ').trim().slice(0, n);\nconst s = { url: clip(b.url, 600), note: clip(b.note, 400), name: clip(b.name, 80), email: clip(b.email, 200), website: clip(b.website, 100) };\nlet fetch_url = 'about:blank';\n// (no URL class in the n8n sandbox, so parse by hand) only public http(s) pages by name:\n// no IP literals, no user:pass@, no odd ports, no local or internal hosts\nconst m = s.url.match(/^(https?):\\/\\/([a-z0-9.-]+)(?::(\\d+))?([\\/?#][^\\s]*)?$/i);\nif (m) {\n  const host = m[2].toLowerCase(), port = m[3];\n  const ipLike = /^[0-9.]+$/.test(host);\n  const local = /(^|\\.)(localhost|local|internal|lan|home|corp)$/.test(host) || !host.includes('.');\n  if (!ipLike && !local && (!port || port === '80' || port === '443')) fetch_url = s.url;\n}\nif (s.website) fetch_url = 'about:blank';            // honeypot filled: don't bother fetching\nreturn [{ json: { s, fetch_url } }];\n"
+      }
+    },
+    {
+      "id": "5ae692ef-5803-48d5-93c5-ad5f3f0d70b2",
+      "name": "Fetch suggested page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        1200
+      ],
+      "parameters": {
+        "url": "={{ $json.fetch_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 8000,
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 4
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "neverError": true,
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "7da32756-4a86-4d33-96c5-1fd21a5332c5",
+      "name": "Read page title",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        1200
+      ],
+      "parameters": {
+        "jsCode": "// Pull the page title so Shreya sees a headline, not just a link\nconst { s } = $('Check suggestion').first().json;\nconst page = $input.first().json || {};\nconst html = typeof page.data === 'string' ? page.data.slice(0, 200000) : '';\nconst ENT = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '\"', '&#39;': \"'\", '&#039;': \"'\", '&rsquo;': \"'\", '&lsquo;': \"'\", '&ldquo;': '\"', '&rdquo;': '\"', '&nbsp;': ' ', '&ndash;': '-', '&mdash;': '-', '&#8217;': \"'\", '&#8216;': \"'\", '&#8220;': '\"', '&#8221;': '\"', '&#x27;': \"'\" };\nconst decode = (t) => t.replace(/&[#a-z0-9]+;/gi, (m) => ENT[m.toLowerCase()] || ' ');\nconst meta = (prop) => {\n  const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=[\"']${prop}[\"'][^>]*content=[\"']([^\"']+)[\"']`, 'i'))\n    || html.match(new RegExp(`<meta[^>]+content=[\"']([^\"']+)[\"'][^>]*(?:property|name)=[\"']${prop}[\"']`, 'i'));\n  return m ? m[1] : '';\n};\nlet title = meta('og:title') || meta('twitter:title') || ((html.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i) || [])[1] || '');\ntitle = decode(title.replace(/<[^>]+>/g, ' ')).replace(/\\s+/g, ' ').trim().slice(0, 300);\nif (!title) {\n  // the site blocked us: make a readable headline from the link itself (\"meesho-shares-surge-5\" -> \"Meesho shares surge 5\")\n  const segs = s.url.replace(/[?#].*$/, '').split('/').filter((x) => /[a-z]-[a-z]/i.test(x));\n  const slug = segs.sort((x, y) => y.length - x.length)[0] || '';\n  const words = slug.replace(/\\.[a-z]+$/i, '').replace(/[-_]+/g, ' ').replace(/\\b\\d{6,}\\b/g, '').trim();\n  if (words) title = (words.charAt(0).toUpperCase() + words.slice(1)).slice(0, 200);\n}\nconst b64 = Buffer.from(JSON.stringify(Object.assign({}, s, { title })), 'utf8').toString('base64');\nreturn [{ json: { b64 } }];\n"
+      }
+    },
+    {
+      "id": "d06efeec-4ea0-4062-a8ef-a4bd2f48a78b",
+      "name": "Save suggestion",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        1200
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT web_suggest($1) AS r, d_config_json() AS cfg;",
+        "options": {
+          "queryReplacement": "={{ $json.b64 }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "3d37474b-48fc-444c-b495-8ec92ba05b36",
+      "name": "Reply suggestion",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        1100
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify({ ok: $json.r.ok, message: $json.r.message }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cf75de3a-4c6c-4879-861c-87e642cc6a79",
+      "name": "Tell Shreya?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        1300
+      ],
+      "parameters": {
+        "jsCode": "// Ping Shreya about the first few reader suggestions each day (the rest wait for \"suggestions\")\nconst esc = (v) => String(v == null ? '' : v).replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]));\nconst { r, cfg } = $input.first().json;\nif (!r || !r.ok || !r.notify || !r.suggestion || !cfg.telegram_chat_id) return [];\nconst sg = r.suggestion;\nreturn [{ json: { method: 'sendMessage', body: { chat_id: cfg.telegram_chat_id, parse_mode: 'HTML', link_preview_options: { is_disabled: true },\n  text: `📮 <b>Reader suggestion #${sg.id}</b>${sg.name ? ` from ${esc(sg.name)}` : ''}\\n<a href=\"${esc(sg.url)}\">${esc(sg.title || sg.url)}</a>` +\n    (sg.note ? `\\n“${esc(sg.note)}”` : '') +\n    `\\n\\nType <b>take ${sg.id}</b> to add it to the next draft, or <b>skip ${sg.id}</b>.` +\n    (r.open_count > 1 ? ` (${r.open_count} waiting: send <b>suggestions</b>)` : '') } } }];\n"
+      }
+    },
+    {
+      "id": "5394790f-ea4f-4bb5-bfad-1c600068f6ee",
+      "name": "Tell Shreya",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        1300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Save suggestion').first().json.cfg.telegram_bot_token }}/{{ $json.method }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 350
+            }
+          },
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Issue page": {
+      "main": [
+        [
+          {
+            "node": "Load issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load issue": {
+      "main": [
+        [
+          {
+            "node": "Reply issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pipeline": {
+      "main": [
+        [
+          {
+            "node": "Load pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load pipeline": {
+      "main": [
+        [
+          {
+            "node": "Reply pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "News": {
+      "main": [
+        [
+          {
+            "node": "Load news",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load news": {
+      "main": [
+        [
+          {
+            "node": "Reply news",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suggest a story": {
+      "main": [
+        [
+          {
+            "node": "Check suggestion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check suggestion": {
+      "main": [
+        [
+          {
+            "node": "Fetch suggested page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch suggested page": {
+      "main": [
+        [
+          {
+            "node": "Read page title",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read page title": {
+      "main": [
+        [
+          {
+            "node": "Save suggestion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save suggestion": {
+      "main": [
+        [
+          {
+            "node": "Reply suggestion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tell Shreya?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tell Shreya?": {
+      "main": [
+        [
+          {
+            "node": "Tell Shreya",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign-up": {
+      "main": [
+        [
+          {
+            "node": "Parse sign-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse sign-up": {
+      "main": [
+        [
+          {
+            "node": "Save subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save subscriber": {
+      "main": [
+        [
+          {
+            "node": "Reply sign-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Archive": {
+      "main": [
+        [
+          {
+            "node": "Load archive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load archive": {
+      "main": [
+        [
+          {
+            "node": "Reply archive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stats": {
+      "main": [
+        [
+          {
+            "node": "Load stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load stats": {
+      "main": [
+        [
+          {
+            "node": "Reply stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

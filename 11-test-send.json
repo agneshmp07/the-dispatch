@@ -1,0 +1,170 @@
+{
+  "name": "Dispatch 11 · Test send (from Telegram)",
+  "nodes": [
+    {
+      "id": "ca098f7f-5d68-4fea-b9a6-fbe624202bec",
+      "name": "Test send request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "dispatch-testsend-195db865221b",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "webhookId": "ee4b96c6-b0b9-4982-b54b-67a8fc7c40c9"
+    },
+    {
+      "id": "793cfa88-e476-497a-aa2b-b7ab49e7459d",
+      "name": "Load draft",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT test_send_payload() AS p;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "6ff100a9-c052-4d0b-9777-c51920dbd607",
+      "name": "Build test email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// ---- shared helpers (prepended to every Code node by build.js) ----\nconst esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst toB64 = (o) => {\n  const s = JSON.stringify(o);\n  if (typeof Buffer !== 'undefined') return Buffer.from(s, 'utf8').toString('base64');\n  return btoa(String.fromCharCode(...new TextEncoder().encode(s)));\n};\nconst istDate = (d, opts) => new Date(d).toLocaleString('en-IN', Object.assign({ timeZone: 'Asia/Kolkata' }, opts || { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }));\nconst cfgList = (v) => String(v || '').split('|').map((x) => x.trim()).filter(Boolean);\nconst num = (v, d) => (Number.isFinite(Number(v)) && String(v) !== '' ? Number(v) : d);\n\nfunction geminiJson(resp) {\n  const parts = resp?.candidates?.[0]?.content?.parts || [];\n  let txt = parts.filter((p) => !p.thought && typeof p.text === 'string').map((p) => p.text).join('').trim();\n  if (!txt) throw new Error('Gemini returned no text: ' + JSON.stringify(resp).slice(0, 600));\n  txt = txt.replace(/^```(?:json)?\\s*/i, '').replace(/```\\s*$/, '');\n  try { return JSON.parse(txt); } catch (e) {\n    const m = txt.match(/\\{[\\s\\S]*\\}/);\n    if (m) return JSON.parse(m[0]);\n    throw new Error('Gemini returned invalid JSON: ' + txt.slice(0, 400));\n  }\n}\n\n// ---- Telegram rendering ----\nconst TG_LIMIT = 3900;\nfunction stateBadge(it) {\n  if (it.state === 'kept') return it.edited ? '✏️ Edited & kept' : '✅ Kept';\n  if (it.state === 'dropped') return '🗑 Dropped';\n  return '⏳ Awaiting review';\n}\nfunction renderItem(it) {\n  const head = `<b>#${it.position} · ${esc(it.topic)}</b>`;\n  const title = `<a href=\"${esc(it.url)}\">${esc(it.title)}</a>` + (it.source ? ` (<i>${esc(it.source)}</i>)` : '');\n  const commentary = it.commentary ? esc(it.commentary) : '<i>(no commentary yet: tap ✏️ Edit)</i>';\n  const body = it.state === 'dropped' ? `<s>${commentary}</s>` : commentary;\n  const why = it.reason && it.state !== 'dropped' ? `\\n\\n<i>Why picked: ${esc(it.reason)}</i>` : '';\n  return `${head}\\n${title}\\n\\n${body}${why}\\n\\n${stateBadge(it)}`.slice(0, TG_LIMIT);\n}\nfunction itemKeyboard(it) {\n  if (it.state === 'dropped') return { inline_keyboard: [[{ text: '↩️ Restore', callback_data: `r:${it.item_id}` }]] };\n  return { inline_keyboard: [\n    [{ text: '✅ Keep', callback_data: `k:${it.item_id}` }, { text: '🔁 Swap', callback_data: `s:${it.item_id}` }],\n    [{ text: '✏️ Edit', callback_data: `e:${it.item_id}` }, { text: '🗑 Drop', callback_data: `d:${it.item_id}` }],\n  ] };\n}\nconst approveKeyboard = (issueId) => ({ inline_keyboard: [[{ text: '📋 Review final draft & approve', callback_data: `a:${issueId}` }]] });\nconst confirmKeyboard = (issueId) => ({ inline_keyboard: [\n  [{ text: '✅ Confirm & schedule send', callback_data: `c:${issueId}` }],\n  [{ text: '↩️ Keep editing', callback_data: `x:${issueId}` }],\n] });\n\nfunction draftWarnings(v, cfg) {\n  const w = [];\n  const min = num(cfg.min_stories, 8), max = num(cfg.max_stories, 10), minT = num(cfg.min_topics, 3);\n  if (v.active_count < min || v.active_count > max) w.push(`${v.active_count} stories (target ${min}–${max})`);\n  if (v.topic_count < minT) w.push(`only ${v.topic_count} topic areas (target ≥${minT})`);\n  if ((v.items || []).some((i) => i.state !== 'dropped' && !i.commentary)) w.push('some stories have no commentary');\n  return w;\n}\nfunction summaryLine(v) {\n  return `${v.active_count} stories · ${v.topic_count} topics · ${v.pending_count} awaiting review · ${v.alternates_left} alternates left`;\n}\nfunction previewChunks(v, cfg) {\n  const iss = v.issue;\n  const live = (v.items || []).filter((i) => i.state !== 'dropped');\n  const parts = [`<b>${esc(cfg.newsletter_name || 'The Dispatch')}: final draft</b>\\n${summaryLine(v)}` +\n    (iss.intro ? `\\n\\n<i>${esc(iss.intro)}</i>` : '\\n\\n<i>(no intro: add one with /intro your text)</i>')];\n  live.forEach((it, idx) => {\n    parts.push(`<b>${idx + 1}. ${esc(it.title)}</b> <i>[${esc(it.topic)}]</i>\\n${esc(it.commentary || '(no commentary)')}`);\n  });\n  if (iss.sponsor && iss.sponsor.text) parts.push(`<b>Sponsor:</b> ${esc(iss.sponsor.text)}${iss.sponsor.url ? ' (' + esc(iss.sponsor.url) + ')' : ''}`);\n  const w = draftWarnings(v, cfg);\n  let tail = `\\nSends to <b>${v.active_subscribers}</b> active subscribers at <b>${istDate(v.send_at)}</b> IST, and only after you tap Confirm.`;\n  if (w.length) tail = `\\n⚠️ ${esc(w.join('; '))}` + tail;\n  parts.push(tail);\n  const chunks = []; let cur = '';\n  for (const p of parts) {\n    if ((cur + '\\n\\n' + p).length > TG_LIMIT && cur) { chunks.push(cur); cur = p; } else cur = cur ? cur + '\\n\\n' + p : p;\n  }\n  if (cur) chunks.push(cur);\n  return chunks.map((c) => c.slice(0, 4090));\n}\nconst HELP = [\n  '<b>The Dispatch bot</b>',\n  'Each story in the weekly draft has buttons:',\n  '✅ Keep · 🔁 Swap (next-best alternate) · ✏️ Edit commentary · 🗑 Drop',\n  '',\n  '📌 Paste any link here during the week and it\\'s guaranteed a spot in the next draft (add a note after the link if you like).',\n  '',\n  '🎙 Or just send a voice note: \"drop 3\", \"swap 5\", \"edit 2: new commentary…\", \"intro …\", \"approve\". I\\'ll show what I heard.',\n  'Typed works too: <b>keep 1</b> · <b>drop 3</b> · <b>swap 5</b> · <b>restore 3</b> · <b>edit 2: new text</b>',\n  '',\n  'Just type a word (no / needed):',\n  '<b>status</b>: draft summary',\n  '<b>alternates</b>: runners-up you can add with one tap',\n  '<b>intro</b> your text: set this week\\'s 2-line opener',\n  '<b>sponsor</b> text | link: add a sponsor block (<b>nosponsor</b> removes it)',\n  '<b>stats</b>: subscribers, opens, clicks, source health',\n  '<b>preview</b>: show the full draft',\n  '<b>approve</b>: review & confirm the final draft',\n  '<b>unapprove</b>: withdraw approval before sending starts',\n  '<b>cancel</b>: cancel an edit in progress',\n  '<b>selftest</b>: check the bot end to end',\n  '<b>testsend</b>: email the current draft to yourself only',\n  '<b>newskey</b> KEY: connect the NewsData.io news API',\n  '',\n  'Nothing is ever emailed until you tap <b>Confirm & schedule send</b>.',\n].join('\\n');\n\n// ---- Email rendering ----\nfunction renderEmail(v, cfg, r) {\n  const iss = v.issue;\n  const items = (v.items || []).filter((i) => i.state === 'kept' || i.state === 'proposed');\n  const name = cfg.newsletter_name || 'The Dispatch';\n  const dateStr = istDate(`${iss.week_start}T12:00:00+05:30`, { day: 'numeric', month: 'long', year: 'numeric' });\n  const base = String(cfg.public_base_url || '').replace(/\\/+$/, '');\n  const unsub = `${base}/webhook/dispatch-unsubscribe?t=${encodeURIComponent(r.unsub_token)}`;\n  const site = String(cfg.site_url || '').replace(/\\/+$/, '');\n  const webUrl = site ? `${site}/issue/${encodeURIComponent(iss.issue_no)}` : '';\n  const stories = items.map((it, i) => `\n      <tr><td style=\"padding:22px 0;border-top:1px solid #e6e6e6;\">\n        <div style=\"font:600 11px/1.4 Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#b4441b;\">${i + 1} · ${esc(it.topic)}</div>\n        <a href=\"${esc(it.url)}\" style=\"display:block;margin:6px 0 8px;font:700 19px/1.35 Georgia,serif;color:#111;text-decoration:none;\">${esc(it.title)}</a>\n        <div style=\"font:16px/1.6 Georgia,serif;color:#333;\">${esc(it.commentary)}</div>\n        <div style=\"margin-top:8px;font:13px/1.4 Arial,sans-serif;color:#777;\">${esc(it.source || '')} · <a href=\"${esc(it.url)}\" style=\"color:#b4441b;\">Read →</a></div>\n      </td></tr>`).join('');\n  const html = `<!doctype html><html><body style=\"margin:0;background:#f6f4ef;\">\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f6f4ef;\"><tr><td align=\"center\" style=\"padding:24px 12px;\">\n    <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:620px;background:#fff;padding:0 28px;\">\n      <tr><td style=\"padding:28px 0 18px;\">\n        <div style=\"font:700 28px/1.2 Georgia,serif;color:#111;\">${esc(name)}</div>\n        <div style=\"font:13px/1.5 Arial,sans-serif;color:#777;\">Issue #${esc(iss.issue_no)} · ${esc(dateStr)}${cfg.newsletter_tagline ? ' · ' + esc(cfg.newsletter_tagline) : ''}${webUrl ? ` · <a href=\"${esc(webUrl)}\" style=\"color:#777;\">View in browser</a>` : ''}</div>\n      </td></tr>${iss.intro ? `\n      <tr><td style=\"padding:0 0 22px;font:italic 17px/1.6 Georgia,serif;color:#333;\">${esc(iss.intro)}</td></tr>` : ''}${stories}${iss.sponsor && iss.sponsor.text ? `\n      <tr><td style=\"padding:18px;border:1px dashed #d9cfc2;border-radius:8px;background:#fbf8f2;\">\n        <div style=\"font:600 10px/1.4 Arial,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999;\">Sponsored</div>\n        <div style=\"margin-top:6px;font:15px/1.55 Georgia,serif;color:#333;\">${esc(iss.sponsor.text)}${iss.sponsor.url ? ` <a href=\"${esc(iss.sponsor.url)}\" style=\"color:#b4441b;\">Learn more →</a>` : ''}</div>\n      </td></tr>` : ''}\n      <tr><td style=\"padding:22px 0 30px;border-top:1px solid #e6e6e6;font:12px/1.6 Arial,sans-serif;color:#888;\">\n        You're receiving this because you subscribed to ${esc(name)}.<br>\n        <a href=\"${esc(unsub)}\" style=\"color:#888;\">Unsubscribe in one click</a>, or reply with \"unsubscribe\".\n      </td></tr>\n    </table></td></tr></table></body></html>`;\n  const lead = items[0] ? items[0].title : '';\n  const subject = `${name} #${iss.issue_no}: ${lead}`.slice(0, 120);\n  return { subject, html, unsub, webUrl };\n}\n// ---- end shared helpers ----\n\n// Render the current draft as the real email, addressed only to Shreya's own inbox\nconst p = $input.first().json.p || {};\nconst cfg = p.cfg || {};\nif (!p.view || !p.to) {\n  return [{ json: { skip: true, tg: { chat_id: cfg.telegram_chat_id, parse_mode: 'HTML',\n    text: !p.view ? '📧 No draft to test yet. The draft arrives Wednesday 3 PM.' : '📧 No email address is configured for test sends.' } } }];\n}\nconst view = JSON.parse(JSON.stringify(p.view));\nview.issue.issue_no = view.issue.issue_no || 'TEST';\nconst e = renderEmail(view, cfg, { unsub_token: 'test' });\nreturn [{ json: { skip: false, to: p.to, subject: '[TEST] ' + e.subject, html: e.html,\n  tg: { chat_id: cfg.telegram_chat_id, parse_mode: 'HTML', text: `📧 Test email sent to <b>${esc(p.to)}</b>. Check how it looks (and your spam folder). Subscribers got nothing.` } } }];\n"
+      }
+    },
+    {
+      "id": "217627b4-fb83-47fb-a41a-397077f351df",
+      "name": "Send test email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.brevo.com/v3/smtp/email",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.skip ? '{}' : JSON.stringify({ sender: { name: $('Load draft').first().json.p.cfg.sender_name, email: $('Load draft').first().json.p.cfg.sender_email }, to: [{ email: $json.to }], subject: $json.subject, htmlContent: $json.html, tags: ['dispatch-test'] }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_BREVO",
+          "name": "Dispatch Brevo"
+        }
+      }
+    },
+    {
+      "id": "f0293bb4-dd3d-44db-a0e7-345a6e9a81c1",
+      "name": "Tell Shreya",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Load draft').first().json.p.cfg.telegram_bot_token }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify(Object.assign({}, $('Build test email').first().json.tg, ($('Build test email').first().json.skip || String($json.statusCode).startsWith('2')) ? {} : { text: '📧 Test email failed: ' + String(($json.body && $json.body.message) || $json.statusCode).slice(0, 200) })) }}",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Test send request": {
+      "main": [
+        [
+          {
+            "node": "Load draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load draft": {
+      "main": [
+        [
+          {
+            "node": "Build test email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build test email": {
+      "main": [
+        [
+          {
+            "node": "Send test email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send test email": {
+      "main": [
+        [
+          {
+            "node": "Tell Shreya",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}

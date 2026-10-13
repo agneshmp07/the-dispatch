@@ -1,0 +1,117 @@
+{
+  "name": "Dispatch 9 · Email events (Brevo)",
+  "nodes": [
+    {
+      "id": "c0a5d4bd-26d8-48a3-b1b2-dfb98da55b07",
+      "name": "Brevo event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "dispatch-brevo-5fcda8f4a87db7c2",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "dbf32049-5ce3-4c8b-90c8-199e4e3df4f9"
+    },
+    {
+      "id": "c1cff506-f80c-4c82-b215-2e086470c0a9",
+      "name": "Parse event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        100
+      ],
+      "parameters": {
+        "jsCode": "// Brevo webhook: one event object (or a batch) -> base64 for the database\nlet b = $input.first().json.body;\nif (typeof b === 'string') { try { b = JSON.parse(b); } catch (e) { b = null; } }\nif (!b) return [{ json: { b64: Buffer.from('[]').toString('base64') } }];\nreturn [{ json: { b64: Buffer.from(JSON.stringify(b), 'utf8').toString('base64') } }];\n"
+      }
+    },
+    {
+      "id": "c4d53027-859c-4b8f-b49a-d10dbe728060",
+      "name": "Record event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        440,
+        100
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT record_email_events($1) AS r;",
+        "options": {
+          "queryReplacement": "={{ $json.b64 }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_PG",
+          "name": "Dispatch Postgres"
+        }
+      }
+    },
+    {
+      "id": "a690a09a-4b5e-4f49-a34b-ce42bb0d088a",
+      "name": "OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        100
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "ok",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Brevo event": {
+      "main": [
+        [
+          {
+            "node": "Parse event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse event": {
+      "main": [
+        [
+          {
+            "node": "Record event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record event": {
+      "main": [
+        [
+          {
+            "node": "OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": []
+}
