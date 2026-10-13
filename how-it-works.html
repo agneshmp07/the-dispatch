@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How it works · The Dispatch</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%23b4441b'/><text x='32' y='45' font-family='Georgia' font-size='40' font-weight='700' text-anchor='middle' fill='white'>D</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#0e0f12;--panel:#15171c;--line:#262a33;--ink:#e9ecf2;--muted:#8b93a3;--dot:#3ddc84;--human:#f0883e;--s1:#5fd394;--s2:#f3b85c;--s3:#c9d36a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e0f12}}
+:root[data-theme="dark"]{--bg:#0e0f12}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding:36px 16px 56px}
+.hint{display:none;color:var(--muted);font-size:12px;margin:0 0 8px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:16px}
+.board{position:relative;min-width:1080px;padding:26px 22px 22px;background:var(--panel);border:1px solid var(--line);border-radius:16px}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin:0 0 16px}
+h1{font-size:24px;font-weight:650;letter-spacing:-.01em;margin:0 0 4px}
+.lead{color:var(--muted);margin:0;font-size:13px}
+.stages{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.stg{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 6px;font-size:12.5px;white-space:nowrap}
+.stg b{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;color:#0e0f12;font-size:11px}
+.stg small{color:var(--muted);font-size:12px}
+.grid{display:grid;grid-template-columns:150px repeat(5,minmax(0,1fr));row-gap:7px;position:relative}
+.hd{font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:4px 12px 4px}
+.cell{padding:10px 10px;display:flex;flex-direction:column;gap:8px;justify-content:center;align-items:flex-start;min-height:62px;background:var(--tint)}
+.actor{border-radius:10px 0 0 10px;padding-left:14px;gap:1px}
+.cell.last{border-radius:0 10px 10px 0}
+.actor b{font-size:14px;font-weight:650}
+.actor small{color:var(--muted);font-size:11.5px}
+.box{position:relative;z-index:3;border-radius:8px;padding:7px 10px 7px 40px;font-size:12px;line-height:1.3;color:#0e0f12;font-weight:600;width:100%;max-width:178px}
+.box i{position:absolute;left:7px;top:7px;width:26px;height:17px;border-radius:9px;background:#0e0f12;font:700 10px/17px Inter,system-ui,sans-serif;text-align:center;font-style:normal}
+.box em{display:block;font-style:normal;font-weight:400;opacity:.78;font-size:11px;margin-top:1px}
+.hl{position:absolute;border:2px dashed var(--human);border-radius:13px;pointer-events:none;z-index:2}
+.hl span{position:absolute;top:-10px;right:18px;background:var(--panel);color:var(--human);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:0 8px;line-height:18px}
+svg.wires{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:visible}
+svg.wires path.w{fill:none;stroke-width:1.7;stroke-dasharray:5 5;opacity:.9}
+svg.wires circle{fill:var(--dot)}
+.foot{display:flex;flex-wrap:wrap;gap:8px 24px;margin-top:16px;color:var(--muted);font-size:12px}
+.foot i{display:inline-block;vertical-align:middle;margin-right:7px}
+.ld{width:8px;height:8px;border-radius:50%;background:var(--dot)}
+.lh{width:16px;height:11px;border:2px dashed var(--human);border-radius:4px}
+.foot .r{margin-left:auto}
+@media (max-width:900px){.hint{display:block}}
+.sitebar{display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:1240px;margin:0 auto;padding:18px 16px 0}
+.sitebar .logo{font:700 21px/1 Fraunces,Georgia,serif;color:var(--ink);text-decoration:none}.sitebar .logo span{color:#e0703f}
+.sitebar nav{display:flex;gap:18px;flex-wrap:wrap}.sitebar nav a{color:var(--muted);text-decoration:none;font-size:14px}.sitebar nav a:hover,.sitebar nav a[aria-current]{color:var(--ink)}
+.wrap{padding-top:22px!important}
+</style></head><body>
+<header class="sitebar"><a class="logo" href="/">The Dispatch<span>.</span></a><nav><a href="/">Newsletter</a><a href="/how-it-works" aria-current="page">How it works</a><a href="/control">Control Room</a></nav></header>
+
+<div class="wrap">
+  <p class="hint">Swipe sideways to see the whole picture →</p>
+  <div class="scroll"><div class="board" id="board">
+    <div class="top">
+      <div><h1>The Dispatch — how one issue gets made</h1>
+      <p class="lead">Read each colour as one stage, left to right: Trigger → Input → Store → Process → Output. Times IST.</p></div>
+      <div class="stages" id="stages"></div>
+    </div>
+    <div class="grid" id="grid"></div>
+    <div class="hl" id="hl"><span>Human decision</span></div>
+    <svg class="wires" id="wires"></svg>
+    <div class="foot">
+      <span><i class="ld"></i>step starts here</span>
+      <span><i class="lh"></i>needs a person: nothing is sent until Shreya confirms</span>
+      <span class="r">Also: Tue 18:00 preview · Wed 22:00 &amp; Thu 07:30 reminders · Telegram + Talk commands any time</span>
+    </div>
+  </div></div>
+</div>
+
+<script>
+const S=[{n:"Collect",w:"Mon–Wed · 06, 10, 14:00",c:"#5fd394"},{n:"Draft & review",w:"Wed · from 15:00",c:"#f3b85c"},{n:"Send",w:"Thu · from 08:00, once confirmed",c:"#c9d36a"}];
+const K={purple:"#b9a6ff",green:"#7fdca4",blue:"#8cc3ff",amber:"#f3c67a",teal:"#7fd8d4",rose:"#f59aa8",orange:"#ffa765",olive:"#d6dd7f",lilac:"#e1a6f0",sky:"#9fd0f0"};
+// box: [id, stage(1-3), step, colour, title, detail]
+const ROWS=[
+ {a:"Schedules",s:"n8n cron",t:"#1d1830",T:[["a1",1,1,K.purple,"Collect","Mon–Wed 06·10·14"],["b1",2,1,K.purple,"Draft","Wed 15:00"],["c1",3,1,K.purple,"Send window","Thu 08:00, if confirmed"]]},
+ {a:"Sources",s:"28 live feeds",t:"#14241c",I:[["a2",1,2,K.green,"News comes in","13 RSS · 13 Google News · 2 NewsData"]]},
+ {a:"Neon",s:"Postgres database",t:"#131c2c",I:[["b2",2,2,K.blue,"Week's shortlist","saved articles + suggestions"],["c2",3,2,K.blue,"Confirmed issue","+ active readers"]],S:[["a4",1,3,K.blue,"Articles saved","repeats merged"],["b3",2,3,K.blue,"Full texts saved","pages read in full"]]},
+ {a:"n8n",s:"workflows",t:"#1b1f2b",P:[["a5",1,4,K.sky,"Pictures added","from each article page"]]},
+ {a:"Website",s:"Vercel · Control Room",t:"#152325",S:[["c3",3,3,K.teal,"Issue page","saved to the archive"]],O:[["a6",1,5,K.teal,"Collect page","everything found this week"]]},
+ {a:"Gemini",s:"AI editor",t:"#271d14",P:[["b4",2,4,K.amber,"Pick & write","8–10 stories, 3+ topics, Shreya's style"]]},
+ {a:"Telegram + Talk",s:"bot · website chat",t:"#16222a",O:[["b5",2,5,K.teal,"Draft cards","one per story"]]},
+ {a:"Shreya",s:"Human decision",t:"#2a1519",human:1,P:[["b6",2,6,K.rose,"Review & edit","keep · swap · edit · drop"]],O:[["b7",2,7,K.orange,"Confirm & schedule","in Telegram only"]]},
+ {a:"Brevo",s:"email sender",t:"#22220f",P:[["c4",3,4,K.olive,"Send in batches","one email per reader"]]},
+ {a:"Readers",s:"subscribers · website",t:"#1f1726",I:[["a3",1,2,K.lilac,"Suggest a story","form on the site"]],O:[["c5",3,5,K.lilac,"In their inbox","unsubscribes & bounces handled"]]}
+];
+const LINKS=[["a1","a2"],["a2","a4"],["a3","a4"],["a4","a5"],["a5","a6"],
+ ["b1","b2"],["b2","b3"],["b3","b4"],["b4","b5"],["b5","b6"],["b6","b7"],
+ ["c1","c2"],["c2","c3"],["c3","c4"],["c4","c5"]];
+const esc=s=>String(s).replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m]));
+document.getElementById("stages").innerHTML=S.map((s,i)=>`<span class="stg"><b style="background:${s.c}">${i+1}</b>${s.n} <small>${s.w}</small></span>`).join("");
+const COLS=["T","I","S","P","O"],stageOf={};
+let g='<div class="hd">Actor</div>'+["Trigger","Input","Store","Process","Output"].map(h=>`<div class="hd">${h}</div>`).join("");
+for(const r of ROWS){
+  const h=r.human?' data-h="1"':"";
+  g+=`<div class="cell actor" style="--tint:${r.t}"${h}><b>${esc(r.a)}</b><small>${esc(r.s)}</small></div>`;
+  COLS.forEach((k,ci)=>{
+    g+=`<div class="cell${ci===4?" last":""}" style="--tint:${r.t}"${h}>`+(r[k]||[]).map(([id,st,n,c,ti,d])=>{stageOf[id]=st;
+      return `<div class="box" id="${id}" data-col="${ci}" style="background:${c}"><i style="color:${S[st-1].c}">${st}.${n}</i>${esc(ti)}<em>${esc(d)}</em></div>`}).join("")+"</div>";
+  });
+}
+document.getElementById("grid").innerHTML=g;
+function draw(){
+  const b=document.getElementById("board"),br=b.getBoundingClientRect();
+  const R=id=>{const e=document.getElementById(id),r=e.getBoundingClientRect();return{col:+e.dataset.col,l:r.left-br.left,r:r.right-br.left,t:r.top-br.top,b:r.bottom-br.top,cx:(r.left+r.right)/2-br.left,cy:(r.top+r.bottom)/2-br.top}};
+  let s="<defs>"+S.map((x,i)=>`<marker id="ah${i+1}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${x.c}"/></marker>`).join("")+"</defs>";
+  for(const [x,y] of LINKS){
+    const A=R(x),B=R(y),st=stageOf[x],col=S[st-1].c;let x1,y1,x2,y2,d;
+    if(B.col>A.col){x1=A.r;y1=A.cy;x2=B.l;y2=B.cy;const k=Math.max(28,(x2-x1)*.55);d=`M${x1} ${y1}C${x1+k} ${y1} ${x2-k} ${y2} ${x2} ${y2}`}
+    else if(B.col===A.col){x1=A.cx;y1=A.b;x2=B.cx;y2=B.t;d=`M${x1} ${y1}L${x2} ${y2}`}
+    else{x1=A.l;y1=A.cy;x2=B.cx;y2=B.t;d=`M${x1} ${y1}C${x2} ${y1} ${x2} ${y1} ${x2} ${y2}`}
+    s+=`<path class="w" style="stroke:${col}" d="${d}" marker-end="url(#ah${st})"/><circle cx="${x1}" cy="${y1}" r="3.5"/>`;
+  }
+  document.getElementById("wires").innerHTML=s;
+  const hc=b.querySelectorAll('[data-h]'),f=hc[0].getBoundingClientRect(),l=hc[hc.length-1].getBoundingClientRect();
+  Object.assign(document.getElementById("hl").style,{left:f.left-br.left-4+"px",top:f.top-br.top-4+"px",width:l.right-f.left+8+"px",height:f.height+8+"px"});
+}
+addEventListener("load",draw);addEventListener("resize",draw);
+if(document.fonts)document.fonts.ready.then(draw);draw();
+</script>
+</body></html>

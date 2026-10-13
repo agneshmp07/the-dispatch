@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Dispatch Control Room</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='20' fill='%23ff6b1a'/><text x='32' y='45' font-family='Arial' font-size='38' font-weight='900' text-anchor='middle' fill='%23140f1c'>D</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Editorial and restrained: warm paper, ink, one saffron accent, serif headlines, hairline rules */
+:root{--bg:#f6f3ec;--surface:#fffdf8;--surface-2:#efeae0;--ink:#1c1a16;--ink-2:#4a463e;--muted:#7a7468;--line:#e2dccf;--line-2:#d3cbbb;
+  --accent:#a84b14;--accent-soft:rgba(168,75,20,.08);--good:#2f6a3f;--good-soft:rgba(47,106,63,.09);--bad:#9e3626;--bad-soft:rgba(158,54,38,.08);--warn:#8a6411;--warn-soft:rgba(138,100,17,.1);
+  --serif:'Fraunces',Georgia,'Times New Roman',serif;--font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;
+  --shadow:0 1px 2px rgba(28,26,22,.04),0 8px 24px -12px rgba(28,26,22,.12)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12110f;--surface:#1a1916;--surface-2:#23211d;--ink:#ede7dc;--ink-2:#c4bdb0;--muted:#8f887b;--line:#2c2924;--line-2:#3a362f;
+  --accent:#d98c55;--accent-soft:rgba(217,140,85,.1);--good:#7fbf8e;--good-soft:rgba(127,191,142,.1);--bad:#e08a7a;--bad-soft:rgba(224,138,122,.1);--warn:#d8b25a;--warn-soft:rgba(216,178,90,.1);--shadow:none}}
+:root[data-theme="dark"]{--bg:#12110f;--surface:#1a1916;--surface-2:#23211d;--ink:#ede7dc;--ink-2:#c4bdb0;--muted:#8f887b;--line:#2c2924;--line-2:#3a362f;
+  --accent:#d98c55;--accent-soft:rgba(217,140,85,.1);--good:#7fbf8e;--good-soft:rgba(127,191,142,.1);--bad:#e08a7a;--bad-soft:rgba(224,138,122,.1);--warn:#d8b25a;--warn-soft:rgba(216,178,90,.1);--shadow:none}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+a{color:inherit}button{font:inherit;cursor:pointer;color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+::selection{background:var(--accent);color:var(--bg)}
+
+/* masthead */
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:saturate(1.2) blur(10px);border-bottom:1px solid var(--line)}
+.navbar{max-width:1120px;margin:0 auto;padding:0 24px;display:flex;align-items:center;gap:28px;height:64px}
+.logo{display:flex;align-items:baseline;gap:10px;white-space:nowrap}
+.logo .mark{font:600 21px/1 var(--serif);letter-spacing:-.01em}
+.logo .mark i{font-style:italic;font-weight:400;color:var(--accent)}
+.logo .sub{font:500 10px var(--font);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.nav{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;height:100%}
+.nav::-webkit-scrollbar{display:none}
+.nav button{border:0;background:none;padding:0 10px;font-size:14px;font-weight:500;color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:7px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.nav button:hover{color:var(--ink)}
+.nav button[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+.nav .dot{width:6px;height:6px;border-radius:50%;background:var(--line-2)}
+.nav .dot.done{background:var(--good)}.nav .dot.now{background:var(--accent)}
+.badge-n{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--accent);color:var(--bg);font:600 10px var(--font)}
+.rf{border:1px solid var(--line-2);background:transparent;color:var(--ink-2);border-radius:6px;padding:6px 12px;font-size:13px;font-weight:500;white-space:nowrap}
+.rf:hover{border-color:var(--ink);color:var(--ink)}
+
+/* headings */
+.kicker{display:flex;align-items:center;gap:12px;font:600 11px var(--font);letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 18px}
+.kicker::after{content:"";height:1px;width:48px;background:currentColor;opacity:.5}
+h1{font:400 clamp(36px,5.4vw,64px)/1.04 var(--serif);letter-spacing:-.025em;margin:0 0 18px;max-width:18ch;font-variation-settings:"opsz" 144}
+h1 em{font-style:italic;color:var(--accent)}
+.lead{color:var(--ink-2);font-size:17px;line-height:1.65;max-width:62ch;margin:0}
+.hero{padding:64px 0 8px}
+.page-h{padding:56px 0 28px;border-bottom:1px solid var(--line);margin-bottom:32px}
+h2{font:500 26px/1.2 var(--serif);letter-spacing:-.015em;margin:48px 0 6px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+.page[hidden]{display:none}
+
+/* six steps as a single timeline */
+.track{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));margin:48px 0 0;border-top:1px solid var(--line-2)}
+.stp{position:relative;border:0;background:none;text-align:left;padding:22px 16px 0 0;min-width:0;color:inherit}
+.stp::before{content:"";position:absolute;top:-5px;left:0;width:9px;height:9px;border-radius:50%;background:var(--bg);border:1px solid var(--line-2)}
+.stp.done::before{background:var(--good);border-color:var(--good)}
+.stp.now::before{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 5px var(--accent-soft)}
+.stp.done::after{content:"";position:absolute;top:-1px;left:0;right:0;height:1px;background:var(--good)}
+.stp .n{font:500 11px var(--font);letter-spacing:.14em;color:var(--muted)}
+.stp .t{font:500 17px/1.25 var(--serif);margin:6px 0 4px}
+.stp .w{font-size:12.5px;color:var(--muted)}
+.stp.now .t{color:var(--accent)}
+.stp:hover .t{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+
+/* figures */
+.blocks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:48px;border-top:1px solid var(--ink);border-bottom:1px solid var(--line)}
+.blk{padding:24px 24px 26px 0;min-width:0;display:flex;flex-direction:column;gap:10px}
+.blk + .blk{padding-left:24px;border-left:1px solid var(--line)}
+.blk b{font:300 clamp(34px,4.2vw,52px)/1 var(--serif);letter-spacing:-.03em;font-variant-numeric:lining-nums tabular-nums}
+.blk span{font-size:13.5px;font-weight:500;color:var(--ink-2)}
+.blk small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;margin-top:40px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:26px;box-shadow:var(--shadow)}
+.card h3{margin:0 0 6px;font:500 20px/1.25 var(--serif);letter-spacing:-.01em}
+.card.ink{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.card.ink .sub{color:inherit;opacity:.7}
+.card.ink .cmd{background:transparent;color:var(--bg);border-color:color-mix(in srgb,var(--bg) 40%,transparent)}
+.cmd{display:inline-block;font:500 12.5px var(--mono);background:var(--surface-2);color:var(--ink);border:1px solid var(--line-2);border-radius:5px;padding:4px 10px;margin:4px 6px 4px 0}
+.rules{list-style:none;margin:14px 0 0;padding:0}
+.rules li{display:flex;gap:12px;align-items:baseline;font-size:14px;padding:10px 0;border-top:1px solid var(--line)}
+.rules li:first-child{border-top:0}
+.rules .m{flex:0 0 16px;font-weight:600;font-size:13px}
+.rules .ok{color:var(--good)}.rules .no{color:var(--bad)}.rules .wait{color:var(--line-2)}
+
+/* funnel */
+.funnel{display:grid;gap:12px;margin:0 0 36px}
+.fn{display:grid;grid-template-columns:200px minmax(0,1fr) 70px;gap:16px;align-items:center}
+.fn .b{height:6px;border-radius:3px;background:var(--ink) !important;min-width:6px;transform-origin:left}
+.fn:last-child .b{background:var(--accent) !important}
+.fn .l{font-size:14px;color:var(--ink-2)}
+.fn .v::before{display:none}
+.fn .v{letter-spacing:-.01em;text-transform:none;color:var(--ink);display:block;font:400 22px var(--serif);text-align:right;font-variant-numeric:tabular-nums}
+
+/* lists */
+.tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.tools input,.tools select{border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:6px;padding:10px 14px;font:inherit;font-size:14px;min-width:0}
+.tools input:focus,.tools select:focus{outline:none;border-color:var(--ink)}
+.tools input{flex:1 1 260px}
+.chips{display:flex;flex-wrap:wrap;gap:18px;margin:0 0 16px;border-bottom:1px solid var(--line)}
+.chips button{border:0;background:none;padding:8px 0;font-size:13.5px;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.chips button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.rows{border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:20px;padding:18px 0;border-bottom:1px solid var(--line)}
+.row a{text-decoration:none;font:500 17px/1.35 var(--serif)}.row a:hover{color:var(--accent)}
+.row > div > span:not(.v){font:500 17px/1.35 var(--serif)}
+.row.pic{grid-template-columns:150px 120px minmax(0,1fr)}
+.th{width:120px;aspect-ratio:3/2;border-radius:6px;overflow:hidden;background:var(--surface-2);align-self:start}
+.th img,.hero img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.92)}
+.mono{display:grid;place-items:center;background:var(--surface-2)}
+.mono span{font:300 italic 34px/1 var(--serif);color:var(--line-2)}
+.story .hero{position:relative;margin:-26px -26px 22px;padding-top:56.25%;overflow:hidden;border-radius:10px 10px 0 0;background:var(--surface-2)}
+.story .hero img{position:absolute;inset:0}
+.story .hero.mono{display:none}
+.story .hero + .pos{top:auto;transform:translateY(-4px)}
+.row .meta{font-size:12.5px;color:var(--muted);margin-top:4px}
+.row .why{font-size:14px;color:var(--ink-2);margin-top:6px}
+.v{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.v::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.v.in{color:var(--accent)}.v.ok{color:var(--good)}.v.no{color:var(--bad)}.v.alt{color:var(--warn)}
+.more{display:block;margin:24px auto 0;border:1px solid var(--line-2);background:transparent;border-radius:6px;padding:10px 20px;font-size:14px}
+.more:hover{border-color:var(--ink)}
+.empty{color:var(--muted);padding:32px;text-align:center;border:1px dashed var(--line-2);border-radius:10px;font-size:14px}
+
+/* draft */
+.checks{display:flex;flex-wrap:wrap;gap:8px 20px;margin-bottom:24px}
+.ck{display:inline-flex;gap:7px;font-size:13px;font-weight:500;color:var(--muted)}
+.ck.ok{color:var(--good)}.ck.no{color:var(--bad)}
+.intro{font:italic 400 22px/1.5 var(--serif);color:var(--ink-2);margin:0 0 28px;padding-left:20px;border-left:2px solid var(--accent)}
+.stories{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.story{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:26px 26px 22px;position:relative;box-shadow:var(--shadow);transition:border-color .2s}
+.story:hover{border-color:var(--line-2)}
+.story .pos{position:absolute;top:22px;right:24px;font:300 italic 30px/1 var(--serif);color:var(--line-2)}
+.story .meta{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:12px;color:var(--muted);padding-right:44px}
+.topic{display:inline-block;font-weight:600;letter-spacing:.12em;text-transform:uppercase;font-size:10.5px;color:var(--accent)}
+.story h3{margin:12px 0 10px;font:500 21px/1.3 var(--serif);letter-spacing:-.01em}
+.story h3 a{text-decoration:none}.story h3 a:hover{color:var(--accent)}
+.story p{margin:0;color:var(--ink-2);font-size:15px;line-height:1.65}
+.story .gem{margin-top:16px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+.story.dropped{opacity:.5}.story.dropped h3{text-decoration:line-through}
+details.full{margin-top:14px}
+details.full summary{cursor:pointer;font-size:13px;font-weight:500;color:var(--accent);list-style:none}
+details.full summary::-webkit-details-marker{display:none}
+details.full summary::before{content:"+ "}details.full[open] summary::before{content:"− "}
+details.full p{margin-top:10px;font:15px/1.7 var(--serif);color:var(--ink-2);max-height:340px;overflow:auto;white-space:pre-line;padding:14px 16px;background:var(--bg);border-radius:6px}
+
+/* voice */
+.guide{columns:2 320px;column-gap:40px}
+.guide section{break-inside:avoid;margin-bottom:22px}
+.guide h4{margin:0 0 8px;font:600 11px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.guide p,.guide li{color:var(--ink-2);font-size:14.5px;margin:0 0 7px}
+.guide ul,.guide ol{margin:0;padding-left:18px}
+.edit{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:14px}
+.edit div{padding:14px 16px;font:15px/1.6 var(--serif);border-left:2px solid var(--line-2)}
+.edit .was{color:var(--muted)}.edit .was s{text-decoration-color:var(--bad)}
+.edit .now{border-left-color:var(--good);color:var(--ink)}
+.edit small{display:block;font:600 10.5px var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+
+/* issues */
+.issues{border-top:1px solid var(--line)}
+.iss{border-bottom:1px solid var(--line)}
+.iss summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:16px;align-items:center;padding:22px 0}
+.iss summary::-webkit-details-marker{display:none}
+.iss summary b{font:400 26px var(--serif)}.iss summary span{color:var(--muted);font-size:13px}
+.iss .body{padding:0 0 26px}
+.iss .body ol{margin:8px 0 0;padding-left:22px}.iss .body li{margin:14px 0}
+.iss .body li a{font:500 17px var(--serif);text-decoration:none}.iss .body li a:hover{color:var(--accent)}
+.iss .body li p{margin:4px 0 0;color:var(--ink-2);font-size:14.5px}
+
+/* chart + tables */
+.chart{position:relative}.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{fill:var(--muted);font:12px var(--font)}.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .bar{fill:var(--ink)}.chart .bar.dim{opacity:.18}.chart .val{fill:var(--ink);font-weight:600;font-size:13px}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:6px;padding:8px 10px;font-size:13px;line-height:1.4;white-space:nowrap;opacity:0;transform:translate(-50%,-110%);transition:opacity .12s}
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{text-align:left;font-weight:600;color:var(--muted);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:8px 0;border-bottom:1px solid var(--line)}
+.tbl td{padding:11px 0;border-bottom:1px solid var(--line)}
+.tbl td.n{font-family:var(--mono);text-align:right}
+
+.srcs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));border-top:1px solid var(--line)}
+.src{display:flex;gap:12px;align-items:baseline;padding:14px 16px 14px 0;border-bottom:1px solid var(--line);font-size:14px}
+.src .ic{font-weight:700;font-size:12px}.src .ic.ok{color:var(--good)}.src .ic.no{color:var(--bad)}
+.src small{display:block;color:var(--muted);font-size:12.5px}
+.talk{padding:0;overflow:hidden}
+.talk .log{height:min(56vh,560px);overflow-y:auto;padding:28px 28px 8px;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth}
+.talk .hello{margin:auto;max-width:44ch;text-align:center;color:var(--muted);font:italic 400 18px/1.5 var(--serif)}
+.msg{max-width:min(78%,640px)}
+.msg.me{align-self:flex-end}
+.msg.me p{margin:0;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:14px 14px 4px 14px;font-size:14.5px;white-space:pre-wrap}
+.msg.bot .bub{background:var(--surface-2);padding:12px 16px;border-radius:14px 14px 14px 4px;font-size:14.5px;line-height:1.6;white-space:pre-wrap;color:var(--ink)}
+.msg.bot .bub a{color:var(--accent)}.msg.bot .bub code{font:13px var(--mono)}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.btns button,.chips2 button{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:5px 12px;font-size:12.5px}
+.btns button:hover,.chips2 button:hover{border-color:var(--ink);color:var(--ink)}
+.chips2{display:flex;flex-wrap:wrap;gap:6px;padding:12px 28px;border-top:1px solid var(--line)}
+.say{display:flex;gap:8px;align-items:flex-end;padding:0 28px 14px}
+.say textarea{flex:1;min-width:0;resize:none;border:1px solid var(--line-2);background:var(--bg);color:var(--ink);border-radius:10px;padding:12px 14px;font:inherit;font-size:15px;line-height:1.4;max-height:160px}
+.say textarea:focus{outline:none;border-color:var(--ink)}
+.say .mic{flex:0 0 44px;height:44px;border-radius:50%;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);display:grid;place-items:center}
+.say .mic.on{background:var(--accent);border-color:var(--accent);color:var(--bg);box-shadow:0 0 0 6px var(--accent-soft)}
+.say .send{height:44px;border:0;border-radius:10px;padding:0 18px;background:var(--ink);color:var(--bg);font-weight:500}
+.say .send:disabled{opacity:.5}
+.tfoot{display:flex;align-items:center;gap:16px;padding:0 28px 16px;font-size:12.5px;color:var(--muted)}
+.tfoot label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.tfoot #thint{flex:1;color:var(--accent)}
+.linkish{border:0;background:none;color:var(--muted);text-decoration:underline;font-size:12.5px;padding:0}
+.note{display:flex;gap:12px;align-items:flex-start;background:var(--accent-soft);border-left:2px solid var(--accent);padding:14px 18px;margin-bottom:24px;font-size:14px;color:var(--ink-2)}
+.note i{font-style:normal}
+footer{margin:80px 0 48px;padding-top:24px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
+.lock{max-width:400px;margin:18vh auto;padding:0 24px;text-align:center}
+.lock .logo{justify-content:center;flex-direction:column;align-items:center;gap:8px;margin-bottom:8px}
+.lock .logo .mark{font-size:34px}
+.lock input{width:100%;padding:13px 16px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit;margin:22px 0 10px;text-align:center;letter-spacing:.06em}
+.lock input:focus{outline:none;border-color:var(--ink)}
+.lock .go{border:0;border-radius:6px;padding:13px 22px;background:var(--ink);color:var(--bg);font-weight:500;width:100%}
+
+@media (max-width:900px){
+  .navbar{gap:0 16px;padding:12px 16px 0;flex-wrap:wrap;height:auto;justify-content:space-between}.wrap{padding:0 16px}
+  .nav{order:3;flex-basis:100%;height:44px;margin:0 -10px}
+  .logo .sub{display:none}
+  .track{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:28px}
+  .blocks{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .blk:nth-child(3){padding-left:0;border-left:0}
+  .blk:nth-child(n+3){border-top:1px solid var(--line)}
+  .two,.stories{grid-template-columns:minmax(0,1fr)}
+  .hero{padding-top:40px}
+}
+@media (max-width:560px){
+  .talk .log{padding:20px 16px 8px;height:60vh}.chips2,.say,.tfoot{padding-left:16px;padding-right:16px}.msg{max-width:90%}
+  .row.pic{grid-template-columns:minmax(0,1fr) 88px}.row.pic > div:first-child{grid-column:1/-1}.row.pic .th{width:88px;grid-column:2;grid-row:2}.row.pic > div:last-child{grid-column:1;grid-row:2}
+  .track{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .row{grid-template-columns:minmax(0,1fr);gap:8px}
+  .fn{grid-template-columns:minmax(0,1fr) 56px}.fn .l{grid-column:1/-1;font-size:13px}
+  .edit{grid-template-columns:minmax(0,1fr)}
+  .blk{padding-right:12px}.blk + .blk{padding-left:12px}
+  .card{padding:20px}
+}
+.embed{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}.embed-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);background:var(--surface-2)}.embed-bar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}.embed-bar a{color:var(--accent);text-decoration:none;font-weight:500;white-space:nowrap}.embed iframe{display:block;width:100%;border:0;min-height:70vh;background:#fff}@media (min-width:901px){.navbar{gap:18px}.nav{gap:0}.nav button{padding:0 8px;font-size:13.5px}}@media (min-width:901px) and (max-width:1360px){.logo .sub{display:none}}</style>
+</head>
+<body>
+<div id="app"><p class="empty" style="margin:40vh auto;max-width:300px">Loading the control room…</p></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+const API = 'https://newss.app.n8n.cloud/webhook/dispatch-pipeline';
+const app = document.getElementById('app');
+const MOTION = typeof window.gsap !== 'undefined' && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = n => Number(n || 0).toLocaleString('en-IN');
+const pct = (a, b) => b ? Math.round(1000 * a / b) / 10 : 0;
+const safeUrl = u => /^https?:\/\//i.test(String(u || '')) && !/example\.com/i.test(u) ? u : '#';
+const ist = (t, o) => t ? new Date(String(t).length <= 19 && !/Z|\+/.test(t) ? t + '+05:30' : t).toLocaleString('en-IN', Object.assign({ timeZone: 'Asia/Kolkata' }, o || { weekday: 'short', hour: 'numeric', minute: '2-digit' })) : '';
+const hm = t => ist(t, { hour: 'numeric', minute: '2-digit' });
+const ago = t => { if (!t) return ''; const h = (Date.now() - new Date(t)) / 36e5; return h < 1 ? 'just now' : h < 24 ? Math.round(h) + 'h ago' : Math.round(h / 24) + 'd ago'; };
+const link = (u, t) => { const s = safeUrl(u); return s === '#' ? `<span>${esc(t)}</span>` : `<a href="${esc(s)}" target="_blank" rel="noopener">${esc(t)}</a>`; };
+
+/* ---------- key ---------- */
+function getKey() {
+  const h = new URLSearchParams(location.hash.slice(1)).get('key');
+  if (h) { try { localStorage.setItem('dispatch_key', h); } catch (e) {} history.replaceState(null, '', location.pathname + location.search); return h; }
+  try { return localStorage.getItem('dispatch_key'); } catch (e) { return null; }
+}
+function lock(msg) {
+  app.innerHTML = `<div class="lock"><div class="logo"><span class="mark">The <i>Dispatch</i></span><span class="sub">Control Room</span></div>
+    <p style="color:var(--ink-2)">${esc(msg || 'Enter your dashboard key to open the control room.')}</p>
+    <form id="f"><input id="k" type="password" placeholder="Dashboard key" autocomplete="off"><button class="go">Open →</button></form><p style="margin-top:22px;font-size:14px;color:var(--muted)"><a href="/">← Back to the newsletter</a> · <a href="/how-it-works">How it works</a></p></div>`;
+  document.getElementById('f').onsubmit = e => { e.preventDefault(); const k = document.getElementById('k').value.trim(); if (k) { try { localStorage.setItem('dispatch_key', k); } catch (x) {} load(k); } };
+}
+
+/* ---------- where are we this week? ---------- */
+function stage(d) {
+  const dr = d.draft, st = dr ? dr.issue.status : 'none';
+  if (st === 'sent') return 7;
+  if (st === 'approved' || st === 'sending') return 6;
+  if (st === 'in_review') return dr.pending_count === 0 ? 5 : 4;
+  return 1;
+}
+function steps(d) {
+  const sch = d.schedule, cur = stage(d);
+  return [
+    ['collect', 'Collect', 'Mon–Wed, 3× a day'],
+    ['collect', 'Remove repeats', 'Every run'],
+    ['draft', 'Gemini picks', 'Wed ' + hm(sch.draft_at)],
+    ['draft', 'You review', 'Telegram, Wed eve'],
+    ['draft', 'You confirm', 'Reminder ' + hm(sch.reminder_at)],
+    ['archive', 'Send', 'Thu ' + hm(sch.send_at)],
+  ].map(([p, t, w], i) => ({ p, t, w, s: i + 1 < cur || (cur === 1 && i === 1 && d.ingest.total) ? 'done' : i + 1 === cur ? 'now' : '' }));
+}
+function headline(d) {
+  const dr = d.draft, st = dr ? dr.issue.status : 'none', sch = d.schedule;
+  if (st === 'none' || st === 'cancelled') return {
+    k: 'Collecting', h: `<em>${fmt(d.ingest.total)}</em> stories in. Picks on Wednesday.`,
+    l: `Feeds and the news API are read Mon–Wed and repeats are thrown out as they arrive. Wednesday at ${hm(sch.draft_at)}, Gemini picks ${d.rules.min_stories}–${d.rules.max_stories} stories and the draft lands in your Telegram.`,
+    next: ['Nothing to do yet. Want a story in for sure? Paste its link in Telegram.', ['<paste a link>', 'stats']] };
+  if (st === 'in_review' && dr.pending_count) return {
+    k: 'Waiting for you', h: `Draft's ready. <em>${dr.pending_count}</em> ${dr.pending_count === 1 ? 'story needs' : 'stories need'} you.`,
+    l: `Gemini picked ${dr.active_count} stories across ${dr.topic_count} topics. Keep, swap, edit or drop each one in Telegram. Nothing goes out until you confirm, and the bot nudges you at ${hm(sch.reminder_at)}.`,
+    next: ['Go through the draft in Telegram, or just type:', ['keep 1', 'swap 3', 'edit 2 …', 'drop 5']] };
+  if (st === 'in_review') return {
+    k: 'One tap left', h: `All reviewed. <em>Approve</em> it.`,
+    l: `Say approve in Telegram, then tap Confirm. It goes to ${fmt(d.readers.active)} readers on Thursday at ${hm(sch.send_at)}.`,
+    next: ['In Telegram, type:', ['approve', 'testsend']] };
+  if (st === 'approved') return {
+    k: 'Confirmed', h: `Issue <em>#${esc(dr.issue.issue_no)}</em> ships Thursday.`,
+    l: `You confirmed it. ${fmt(d.readers.active)} readers get it at ${hm(sch.send_at)}. You can still cancel from Telegram before the send starts.`,
+    next: ['Changed your mind?', ['cancel']] };
+  if (st === 'sending') return {
+    k: 'Sending', h: `<em>${fmt(dr.sent_so_far)}</em> sent. ${fmt(dr.queued)} to go.`,
+    l: 'The send runs in batches to stay under the daily email limit. Bounces and unsubscribes are handled on the way.',
+    next: ['Check progress any time:', ['stats']] };
+  return {
+    k: 'Shipped', h: `Issue <em>#${esc(dr.issue.issue_no)}</em> is out.`,
+    l: `${fmt(dr.sent_so_far)} readers got it. Collection for next week starts Monday morning; opens and clicks fill in on the Readers page.`,
+    next: ['See how it did:', ['stats']] };
+}
+
+/* ---------- article verdicts: why kept / why dropped ---------- */
+function verdict(a, d) {
+  const r = (d.roles || {})[a.id], hasDraft = !!d.draft;
+  if (r) {
+    if (r.role === 'proposed' || r.role === 'kept') return { c: 'in', f: 'draft', l: `In draft · #${r.position}`, w: r.reason || 'Chosen by Gemini for this week.', t: r.topic };
+    if (r.role === 'alternate') return { c: 'alt', f: 'alt', l: `Runner-up ${r.alt_rank || ''}`.trim(), w: r.reason || 'Ready to swap in if you drop a story.', t: r.topic };
+    if (r.role === 'dropped') return { c: 'no', f: 'out', l: 'Dropped by you', w: 'You removed it during review.', t: r.topic };
+    if (r.role === 'swapped_out') return { c: 'no', f: 'out', l: 'Swapped out', w: 'You replaced it with a runner-up.', t: r.topic };
+  }
+  if (a.status === 'duplicate') return { c: 'no', f: 'dup', l: 'Repeat', w: `Same story as “${a.dup_of || 'an earlier article'}”, kept once.` };
+  if (a.status === 'covered') return { c: 'no', f: 'dup', l: 'Already covered', w: `Ran in one of the last ${d.rules.lookback_issues} issues${a.dup_of ? `: “${a.dup_of}”` : ''}.` };
+  if (a.status === 'published') return { c: 'ok', f: 'draft', l: 'Published', w: 'In a sent issue.' };
+  if (a.pinned) return { c: 'in', f: 'pool', l: 'Your pick', w: 'You pinned it, so Gemini must include it.' };
+  return hasDraft ? { c: '', f: 'out', l: 'Not picked', w: 'Gemini chose stronger stories this week.' }
+                  : { c: '', f: 'pool', l: 'In the pool', w: "Waiting for Wednesday's pick." };
+}
+
+/* ---------- shell ---------- */
+const PAGES = [['overview', 'This week', null], ['talk', 'Talk', null], ['collect', 'Articles', 1], ['draft', 'Draft', 3], ['voice', 'Voice', null], ['suggest', 'Suggestions', null], ['readers', 'Readers', null], ['archive', 'Sent', 6], ['sources', 'Sources', null],["workflow","Workflow",null],["site","Website",null]];
+function render(d) {
+  const cur = stage(d);
+  const dot = n => n == null ? '' : `<span class="dot ${n < cur ? 'done' : (n === cur || (n === 3 && cur >= 3 && cur <= 5)) ? 'now' : ''}"></span>`;
+  app.innerHTML = `<header class="top"><div class="navbar"><a class="logo" href="/" title="Back to the newsletter" style="text-decoration:none"><span class="mark">The <i>Dispatch</i></span><span class="sub">Control Room</span></a>
+      <nav class="nav" aria-label="Sections">${PAGES.map(([k, l, n]) => `<button data-p="${k}">${dot(n)}${esc(l)}${k === 'suggest' && d.suggestions && d.suggestions.open ? `<span class="badge-n">${d.suggestions.open}</span>` : ''}</button>`).join('')}</nav>
+      <button class="rf" id="rf" title="Reload the latest data">Refresh</button></div></header>
+    <div class="wrap">
+      <section class="page" id="p-overview">${overview(d)}</section>
+      <section class="page" id="p-talk" hidden>${talkPage()}</section>
+      <section class="page" id="p-collect" hidden>${collectPage(d)}</section>
+      <section class="page" id="p-draft" hidden>${draftPage(d)}</section>
+      <section class="page" id="p-voice" hidden>${voicePage(d)}</section>
+      <section class="page" id="p-suggest" hidden>${suggestPage(d)}</section>
+      <section class="page" id="p-readers" hidden>${readersPage(d)}</section>
+      <section class="page" id="p-archive" hidden>${archivePage(d)}</section>
+      <section class="page" id="p-sources" hidden>${sourcesPage(d)}</section>
+      <section class="page" id="p-workflow" hidden><div class="page-h"><p class="kicker">How it works</p><h1>Every step, <em>one picture</em>.</h1><p class="lead">From the first feed read on Monday to the email in a reader's inbox. Each colour is one stage, and nothing is sent until you confirm in Telegram.</p></div><div class="embed"><div class="embed-bar"><span>the-dispatch-india.vercel.app/how-it-works</span><a href="/how-it-works" target="_blank" rel="noopener">Open full screen ↗</a></div><iframe src="/how-it-works" title="Workflow chart" loading="lazy" onload="fitFrame(this)"></iframe></div></section>
+      <section class="page" id="p-site" hidden><div class="page-h"><p class="kicker">Public website</p><h1>What readers <em>see</em>.</h1><p class="lead">The live newsletter site: latest issue, archive, suggest-a-story and sign-up. Anything a reader sends from here shows up in this Control Room.</p></div><div class="embed"><div class="embed-bar"><span>the-dispatch-india.vercel.app</span><a href="/" target="_blank" rel="noopener">Open the site ↗</a></div><iframe src="/" title="The Dispatch website" loading="lazy" onload="fitFrame(this)"></iframe></div></section>
+      <footer>Updated ${esc(hm(d.generated_at))} IST · The final send is confirmed in Telegram, so nothing here can send by accident.</footer>
+    </div>`;
+  document.getElementById('rf').onclick = () => load(KEY);
+  app.querySelectorAll('[data-p]').forEach(b => b.onclick = (e) => { e.preventDefault(); go(b.dataset.p); });
+  wireArticles(d); wireChart(d.engagement || []); wireTalk();
+  go(new URLSearchParams(location.search).get('p') || 'overview', true);
+}
+function go(p, first) {
+  if (!document.getElementById('p-' + p)) p = 'overview';
+  if (TALK.dirty && p !== 'talk' && !first) { TALK.dirty = false; const u = new URL(location.href); u.searchParams.set('p', p); history.replaceState(null, '', u); return load(KEY); }
+  app.querySelectorAll('.page').forEach(s => s.hidden = s.id !== 'p-' + p);
+  app.querySelectorAll('.nav button').forEach(b => b.dataset.p === p ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  const u = new URL(location.href); p === 'overview' ? u.searchParams.delete('p') : u.searchParams.set('p', p); history.replaceState(null, '', u);
+  if (!first) scrollTo({ top: 0, behavior: 'smooth' });
+  if (!MOTION) return;
+  const pg = document.getElementById('p-' + p);
+  gsap.from(pg.querySelectorAll('h1,.kicker,.lead'), { y: 12, opacity: 0, duration: .9, stagger: .08, ease: 'power3.out' });
+  gsap.from(pg.querySelectorAll('.blk,.stp,.story,.card,.fn,.iss,.src'), { y: 10, opacity: 0, duration: .7, stagger: .03, ease: 'power2.out', delay: .15, clearProps: 'transform,opacity' });
+  pg.querySelectorAll('.fn .b').forEach(b => gsap.from(b, { scaleX: 0, duration: 1.2, ease: 'power3.inOut', delay: .2 }));
+  pg.querySelectorAll('[data-count]').forEach(el => { const o = { v: 0 }, to = +el.dataset.count;
+    gsap.to(o, { v: to, duration: 1.3, ease: 'power3.out', onUpdate: () => el.textContent = fmt(Math.round(o.v)) }); });
+}
+const pageHead = (k, h, l) => `<div class="page-h"><p class="kicker">${k}</p><h1>${h}</h1><p class="lead">${l}</p></div>`;
+
+/* ---------- pages ---------- */
+function overview(d) {
+  const H = headline(d), S = steps(d), dr = d.draft, r = d.rules, ing = d.ingest, st = dr ? dr.issue.status : 'none';
+  const removed = ing.dup_this_week + ing.dup_past_issues;
+  const nOk = dr && dr.active_count >= +r.min_stories && dr.active_count <= +r.max_stories, tOk = dr && dr.topic_count >= +r.min_topics;
+  const rule = (s, t) => `<li><span class="m ${s}">${s === 'ok' ? '✓' : s === 'no' ? '✗' : '·'}</span><span>${t}</span></li>`;
+  const confirmed = ['approved', 'sending', 'sent'].includes(st);
+  return `<div class="hero">
+    <p class="kicker">${esc(H.k)}</p><h1>${H.h}</h1><p class="lead">${esc(H.l)}</p>
+    <div class="track">${S.map((s, i) => `<button class="stp ${s.s}" data-p="${s.p}"><div class="n">STEP 0${i + 1}</div><div class="t">${esc(s.t)}</div><div class="w">${esc(s.w)}</div></button>`).join('')}</div></div>
+  <div class="blocks">
+    <div class="blk c1"><b data-count="${ing.total}">${fmt(ing.total)}</b><div><span>articles collected</span><small>from ${d.sources.total} sources</small></div></div>
+    <div class="blk c3"><b data-count="${removed}">${fmt(removed)}</b><div><span>repeats removed</span><small>${fmt(ing.dup_past_issues)} were in past issues</small></div></div>
+    <div class="blk c2"><b>${dr ? fmt(dr.active_count) : '—'}</b><div><span>stories in the draft</span><small>${dr ? `${dr.topic_count} topics` : 'from Wednesday'}</small></div></div>
+    <div class="blk c4"><b data-count="${d.readers.active}">${fmt(d.readers.active)}</b><div><span>readers</span><small>${d.readers.demo ? `${fmt(d.readers.demo)} are demo data` : `+${fmt(d.readers.new_7d)} this week`}</small></div></div>
+  </div>
+  <div class="two">
+    <div class="card ink"><h3>Your next move</h3><p class="sub">${esc(H.next[0])}</p>${H.next[1].map(c => `<span class="cmd">${esc(c)}</span>`).join('')}
+      ${d.suggestions && d.suggestions.open ? `<p class="sub" style="margin-top:14px">${d.suggestions.open} reader suggestion${d.suggestions.open === 1 ? '' : 's'} waiting. Type <b>suggestions</b> in Telegram.</p>` : ''}
+      <p class="sub" style="margin-top:14px">Type <b>help</b> in Telegram, or <a href="?p=talk" data-p="talk" style="color:inherit">talk to it here</a> by typing or speaking.</p></div>
+    <div class="card"><h3>The rules, checked live</h3><ul class="rules">
+      ${rule(dr ? (nOk ? 'ok' : 'no') : 'wait', `${r.min_stories}–${r.max_stories} stories${dr ? ` (now ${dr.active_count})` : ''}`)}
+      ${rule(dr ? (tOk ? 'ok' : 'no') : 'wait', `At least ${r.min_topics} topics${dr ? ` (now ${dr.topic_count})` : ''}`)}
+      ${rule('ok', `No repeats this week, nothing from the last ${r.lookback_issues} issues`)}
+      ${rule(dr ? 'ok' : 'wait', "2–3 lines on every story, in Shreya's voice")}
+      ${rule(dr && d.reading && d.reading.read ? 'ok' : 'wait', dr && d.reading && d.reading.read ? `Gemini read ${d.reading.read} of ${d.reading.shortlist} shortlisted articles in full` : 'Gemini reads the full articles before writing')}
+      ${rule(confirmed ? 'ok' : 'wait', confirmed ? 'You confirmed the send' : 'Sends only after you confirm')}
+      ${rule(dr && dr.issue.reminder_sent_at ? 'ok' : 'wait', `Reminder Wed ${hm(d.schedule.reminder_at)} if not approved`)}
+    </ul></div>
+  </div>`;
+}
+
+function collectPage(d) {
+  const ing = d.ingest, dr = d.draft;
+  const fresh = ing.total - ing.dup_this_week - ing.dup_past_issues;
+  const short = dr ? dr.items.length + dr.alternates.length : 0, inDraft = dr ? dr.active_count : 0;
+  const F = [['Collected', ing.total, 'var(--saffron)'], ['After removing repeats', ing.unique, 'var(--pink)'], [`Not in last ${d.rules.lookback_issues} issues`, fresh, 'var(--sky)'], ['Gemini shortlist', short, 'var(--violet)'], ['In the draft', inDraft, 'var(--lime)']];
+  const max = Math.max(1, ing.total);
+  const srcs = [...new Set(d.articles.map(a => a.source).filter(Boolean))].sort();
+  const n = f => d.articles.filter(a => f === 'all' || verdict(a, d).f === f).length;
+  return pageHead('Steps 1–2 · Collect & de-duplicate', 'Every article. And <em>why</em>.', `RSS feeds and news API searches run Mon–Wed. Each article is checked against everything collected this week and the last ${d.rules.lookback_issues} newsletters, so you never see the same story twice.`) +
+  `<div class="funnel">${F.map(([l, v, c]) => `<div class="fn"><span class="l">${l}</span><div class="b" style="width:${Math.max(4, 100 * v / max)}%;background:${c}"></div><span class="v">${fmt(v)}</span></div>`).join('')}</div>
+  <div class="tools"><input id="q" type="search" placeholder="Search ${fmt(d.articles.length)} articles…" aria-label="Search articles">
+    <select id="src" aria-label="Source"><option value="">All sources</option>${srcs.map(s => `<option>${esc(s)}</option>`).join('')}</select></div>
+  <div class="chips" id="fl">${[['all', 'All'], ['draft', 'In draft'], ['alt', 'Runners-up'], ['pool', 'In the pool'], ['out', 'Not picked / dropped'], ['dup', 'Repeats']]
+    .map(([k, l], i) => `<button data-f="${k}" aria-pressed="${i === 0}">${l} · ${fmt(n(k))}</button>`).join('')}</div>
+  <div class="rows" id="al"></div><button class="more" id="more" hidden>Show more</button>`;
+}
+function wireArticles(d) {
+  let f = 'all', q = '', src = '', limit = 40;
+  const al = document.getElementById('al'), more = document.getElementById('more');
+  const order = { draft: 0, alt: 1, pool: 2, out: 3, dup: 4 };
+  const all = d.articles.map(a => Object.assign({}, a, { v: verdict(a, d) }));
+  if (d.draft) all.sort((x, y) => order[x.v.f] - order[y.v.f]);
+  const draw = () => {
+    const list = all.filter(a => (f === 'all' || a.v.f === f) && (!src || a.source === src) &&
+      (!q || (a.title + ' ' + (a.summary || '') + ' ' + (a.source || '')).toLowerCase().includes(q)));
+    al.innerHTML = list.length ? list.slice(0, limit).map(a => `<div class="row pic"><div><span class="v ${a.v.c}">${esc(a.v.l)}</span></div>${thumb(d, a.id, a.source, 'th')}<div>
+      ${link(a.url, a.title)}<div class="meta">${a.v.t ? `<span class="topic">${esc(a.v.t)}</span> · ` : ''}${esc(a.source || '')} · ${esc(ago(a.fetched_at))}</div>
+      <div class="why">${esc(a.v.w)}</div></div></div>`).join('') : '<div class="empty" style="border:0">No articles match.</div>';
+    more.hidden = list.length <= limit;
+  };
+  document.getElementById('q').oninput = e => { q = e.target.value.trim().toLowerCase(); limit = 40; draw(); };
+  document.getElementById('src').onchange = e => { src = e.target.value; limit = 40; draw(); };
+  document.getElementById('fl').onclick = e => { const b = e.target.closest('button'); if (!b) return; f = b.dataset.f; limit = 40;
+    document.querySelectorAll('#fl button').forEach(x => x.setAttribute('aria-pressed', x === b)); draw(); };
+  more.onclick = () => { limit += 40; draw(); };
+  draw();
+}
+
+function draftPage(d) {
+  const dr = d.draft, r = d.rules, k = 'Steps 3–5 · Pick, review, confirm';
+  if (!dr) return pageHead(k, 'No draft <em>yet</em>.', `On Wednesday at ${esc(hm(d.schedule.draft_at))} Gemini reads the pool, picks ${r.min_stories}–${r.max_stories} stories across ${r.min_topics}+ topics and writes 2–3 lines on each in Shreya's voice. The draft lands in Telegram and shows up here.`) +
+    '<div class="empty">Meanwhile, see what\'s in the pool on the <b>Articles</b> page.</div>';
+  const nOk = dr.active_count >= +r.min_stories && dr.active_count <= +r.max_stories, tOk = dr.topic_count >= +r.min_topics;
+  const lbl = { proposed: ['alt', 'Needs review'], kept: ['ok', 'Kept'], dropped: ['no', 'Dropped'] };
+  return pageHead(k, dr.issue.issue_no ? `Issue <em>#${esc(dr.issue.issue_no)}</em>, drafted.` : `This week's <em>draft</em>.`, 'Review happens in Telegram: keep, swap, edit or drop each story, then approve and tap Confirm. This page mirrors it live.') +
+  `<div class="checks"><span class="ck ${nOk ? 'ok' : 'no'}">${nOk ? '✓' : '✗'} ${dr.active_count} stories (${r.min_stories}–${r.max_stories})</span>
+    <span class="ck ${tOk ? 'ok' : 'no'}">${tOk ? '✓' : '✗'} ${dr.topic_count} topics (${r.min_topics}+)</span>
+    <span class="ck ok">✓ None from the last ${r.lookback_issues} issues</span>
+    ${d.reading ? (d.reading.read ? `<span class="ck ok">${d.reading.read} of ${d.reading.shortlist} read in full</span>` : '<span class="ck">Full texts saved from the next draft</span>') : ''}</div>
+  ${dr.issue.intro ? `<p class="intro">${esc(dr.issue.intro)}</p>` : ''}
+  <div class="stories">${dr.items.map(it => { const [c, l] = lbl[it.state] || ['', it.state]; return `<article class="story ${it.state}">${thumb(d, it.article_id, it.source, 'hero', true)}<div class="pos">${String(it.position).padStart(2, '0')}</div>
+    <div class="meta"><span class="topic">${esc(it.topic)}</span><span class="v ${c}">${esc(l)}</span>${it.edited ? '<span class="v">Edited by you</span>' : ''}</div>
+    <h3>${link(it.url, it.title)}</h3><p>${esc(it.commentary || '(no commentary yet)')}</p>
+    ${fullText(d, it.article_id)}
+    <div class="gem">${esc(it.source || '')}${it.reason ? ` · Why Gemini picked it: ${esc(it.reason)}` : ''}</div></article>`; }).join('')}</div>
+  ${dr.alternates.length ? `<h2>Runners-up</h2><p class="sub">Type <b>swap N</b> in Telegram and the next one moves in.</p><div class="rows">${dr.alternates.map((a, i) => `<div class="row"><div><span class="v alt">Runner-up ${i + 1}</span></div><div>${link(a.url, a.title)}<div class="meta"><span class="topic">${esc(a.topic)}</span> · ${esc(a.source || '')}</div>${a.reason ? `<div class="why">${esc(a.reason)}</div>` : ''}</div></div>`).join('')}</div>` : ''}`;
+}
+
+// the article's own picture (og:image / feed image); a quiet monogram tile when there isn't one
+function thumb(d, id, source, kind, onlyIfPicture) {
+  const u = d.images && d.images[String(id)];
+  const mono = esc(String(source || '·').replace(/^the\s+/i, '').trim().charAt(0).toUpperCase() || '·');
+  if (!u || !/^https:\/\//i.test(u)) return onlyIfPicture ? '' : `<div class="${kind} mono" aria-hidden="true"><span>${mono}</span></div>`;
+  return `<div class="${kind}"><img src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="var p=this.parentNode;${onlyIfPicture ? 'p.remove()' : `p.classList.add('mono');p.innerHTML='<span>${mono}</span>'`}"></div>`;
+}
+function fullText(d, id) {
+  const t = d.reading && d.reading.texts && d.reading.texts[String(id)];
+  return t ? `<details class="full"><summary>Read what Gemini read</summary><p>${esc(t)}${t.length >= 2500 ? '…' : ''}</p></details>`
+           : (d.reading && d.reading.read ? '<div class="sub" style="margin:10px 0 0">Full article couldn\'t be read (paywall or blocked): Gemini used the summary.</div>' : '');
+}
+function md(src) {
+  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  return String(src || '').split(/^## /m).slice(1).map(p => { const [title, ...rest] = p.split('\n'); let html = '', list = null;
+    const flush = () => { if (list) { html += `<${list.t}>${list.i.map(x => `<li>${x}</li>`).join('')}</${list.t}>`; list = null; } };
+    rest.join('\n').split(/\n(?=\s*(?:- |\d+\. ))|\n\n/).forEach(b => { const t = b.trim(); if (!t) return;
+      const m = t.match(/^(- |\d+\. )([\s\S]*)/);
+      if (m) { const tag = m[1] === '- ' ? 'ul' : 'ol'; if (!list || list.t !== tag) { flush(); list = { t: tag, i: [] }; } list.i.push(inline(m[2].replace(/\s*\n\s*/g, ' '))); }
+      else { flush(); html += `<p>${inline(t.replace(/\s*\n\s*/g, ' '))}</p>`; } });
+    flush(); return `<section><h4>${esc(title)}</h4>${html}</section>`; }).join('');
+}
+function voicePage(d) {
+  const v = d.voice || {}, edits = v.edits || [];
+  const sample = d.sent_issues.find(i => i.stories.length);
+  return pageHead("Shreya's voice", 'Bullish on India. <em>Ruthless</em> on facts.', 'Every commentary is written from this guide. When you edit a line in Telegram, the edit is saved and shown to Gemini next time, so the voice keeps moving closer to yours.') +
+  `<div class="blocks" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+    <div class="blk c5"><b>${v.edit_rate != null ? v.edit_rate + '%' : '—'}</b><div><span>of sent stories you edited</span><small>lower = Gemini sounds more like you</small></div></div>
+    <div class="blk c4"><b>${fmt(edits.length)}</b><div><span>recent edits learned from</span></div></div>
+    <div class="blk c3"><b>35–75</b><div><span>words per commentary</span><small>verdict first, then the fact</small></div></div></div>
+  ${edits.length ? `<h2>What you changed recently</h2><p class="sub">Gemini's line, then yours.</p>${edits.slice(0, 4).map(e => `<div class="card" style="margin-bottom:10px"><span class="topic">${esc(e.topic)}</span> ${e.issue_no ? `<span class="sub">· Issue #${esc(e.issue_no)}</span>` : ''}<div style="font-weight:700;margin-top:4px">${esc(e.title)}</div>
+    <div class="edit"><div class="was"><small>Gemini wrote</small><s>${esc(e.before || '')}</s></div><div class="now"><small>You sent</small>${esc(e.after || '')}</div></div></div>`).join('')}` : ''}
+  ${sample ? `<h2>How it reads</h2><p class="sub">From issue #${esc(sample.issue_no)}.</p><div class="stories">${sample.stories.slice(0, 2).map(s => `<article class="story"><div class="pos">“</div><div class="meta"><span class="topic">${esc(s.topic)}</span></div><h3>${esc(s.title)}</h3><p>${esc(s.commentary || '')}</p></article>`).join('')}</div>` : ''}
+  <h2>Your house rules</h2><p class="sub">Add one any time: type <b>voicerule</b> followed by the rule in Telegram. Gemini follows it from the next draft.</p>
+  ${(d.voice_rules || []).length ? `<div class="card"><ol style="margin:0;padding-left:20px">${d.voice_rules.map(x => `<li style="margin:6px 0">${esc(x)}</li>`).join('')}</ol></div>` : '<div class="empty">No house rules yet. Try: <span class="cmd">voicerule never call a valuation an achievement</span></div>'}
+  <h2>The style guide</h2><p class="sub">Type <b>voice</b> in Telegram for a quick summary.</p>
+  <div class="card guide">${md(v.guide) || '<p>No style guide saved yet.</p>'}</div>`;
+}
+
+function suggestPage(d) {
+  const sg = d.suggestions || { open: 0, taken: 0, week: 0, list: [] };
+  const lbl = { new: ['alt', 'Waiting'], taken: ['ok', 'In the draft pool'], skipped: ['', 'Skipped'] };
+  return pageHead('Reader suggestions', `<em>${fmt(sg.open)}</em> waiting for you.`, 'Readers send links from the “Suggest a story” form on the website. Shreya gets a ping in Telegram, then types take 12 to put one in the next draft (guaranteed a spot) or skip 12 to pass.') +
+  `<div class="blocks" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+    <div class="blk c4"><b>${fmt(sg.open)}</b><div><span>waiting for review</span></div></div>
+    <div class="blk c3"><b>${fmt(sg.taken)}</b><div><span>taken into a draft</span></div></div>
+    <div class="blk c5"><b>${fmt(sg.week)}</b><div><span>sent this week</span></div></div></div>
+  <h2>Latest</h2><p class="sub">Telegram: <b>suggestions</b> lists them · <b>take N</b> adds one · <b>skip N</b> passes.</p>
+  ${sg.list.length ? `<div class="rows">${sg.list.map(x => { const [c, l] = lbl[x.status] || ['', x.status]; return `<div class="row"><div><span class="v ${c}">#${esc(x.id)} · ${esc(l)}</span></div><div>${link(x.url, x.title || x.url)}
+    <div class="meta">${x.name ? esc(x.name) + ' · ' : ''}${esc(ago(x.at))}</div>${x.note ? `<div class="why">“${esc(x.note)}”</div>` : ''}</div></div>`; }).join('')}</div>`
+    : '<div class="empty">No suggestions yet. Share the website and readers can send links from the “Suggest a story” section.</div>'}
+  <p class="sub" style="margin-top:14px"><a href="/#suggest" target="_blank" style="color:var(--accent-ink)">Open the suggestion form →</a></p>`;
+}
+function readersPage(d) {
+  const r = d.readers, au = d.audience || {}, bs = au.by_status || {}, e = d.engagement || [], last = e[e.length - 1], del = last ? (last.delivered || last.sent) : 0;
+  const why = s => /unsub|link/.test(s || '') ? 'Unsubscribed' : /hard/.test(s || '') ? 'Hard bounce' : /spam/.test(s || '') ? 'Marked as spam' : /bounce|blocked|invalid/.test(s || '') ? 'Bounced' : (s || '—');
+  return pageHead('After sending', `<em>${fmt(r.active)}</em> readers. Exits handled.`, 'Unsubscribe links work instantly. Hard bounces and spam complaints remove the address straight away; soft bounces are retried and watched. Nobody who left gets the next issue.') +
+  `${r.demo ? `<div class="note"><div>${fmt(r.demo)} of these readers are demo data. Type <b>cleardemo</b> in Telegram before importing your real list.</div></div>` : ''}
+  <div class="blocks">
+    <div class="blk c2"><b>${last ? pct(last.opened, del) + '%' : '—'}</b><div><span>opened the last issue</span></div></div>
+    <div class="blk c5"><b>${last ? pct(last.clicked, del) + '%' : '—'}</b><div><span>clicked a story</span></div></div>
+    <div class="blk c4"><b>${fmt(bs.unsubscribed ?? r.unsubscribed)}</b><div><span>unsubscribed</span><small>${fmt(bs.spam || 0)} spam complaints</small></div></div>
+    <div class="blk c1"><b>${fmt(bs.bounced ?? r.bounced)}</b><div><span>bounced &amp; removed</span><small>${fmt(bs.soft_watch || 0)} on soft-bounce watch</small></div></div></div>
+  <div class="card" style="margin-top:12px"><h3>Open rate, issue by issue</h3><p class="sub">Share of delivered emails that were opened. Latest issue highlighted.</p>${columnChart(e)}</div>
+  <div class="two">
+    <div class="card"><h3>Recent exits</h3><p class="sub">Latest unsubscribes and bounces (addresses masked).</p>
+      ${(au.recent || []).length ? `<table class="tbl"><thead><tr><th>Reader</th><th>What happened</th><th>When</th></tr></thead><tbody>${au.recent.slice(0, 8).map(x => `<tr><td>${esc(x.email)}</td><td>${esc(why(x.why || x.status))}</td><td>${esc(ago(x.at))}</td></tr>`).join('')}</tbody></table>` : '<p class="sub">None yet.</p>'}</div>
+    <div class="card"><h3>Soft-bounce watch</h3><p class="sub">Temporary failures (full inbox, server down). Removed after 3.</p>
+      ${(au.soft || []).length ? `<table class="tbl"><thead><tr><th>Reader</th><th style="text-align:right">Bounces</th></tr></thead><tbody>${au.soft.map(x => `<tr><td>${esc(x.email)}</td><td class="n">${esc(x.count)}/3</td></tr>`).join('')}</tbody></table>` : '<p class="sub">Nobody on watch.</p>'}
+      <p class="sub" style="margin-top:14px">Want to see the email first? Type <span class="cmd">testsend</span> in Telegram.</p></div>
+  </div>`;
+}
+function columnChart(issues) {
+  if (!issues.length) return '<p class="sub">Appears after your first Thursday send.</p>';
+  const W = 960, H = 260, pl = 36, pb = 28, pt = 22, n = issues.length;
+  const gw = (W - pl) / n, bw = Math.min(26, gw * .5), vals = issues.map(x => pct(x.opened, x.delivered || x.sent));
+  const max = Math.max(60, Math.ceil(Math.max(...vals) / 10) * 10), y = v => pt + (H - pt - pb) * (1 - v / max);
+  let g = '';
+  for (let t = 0; t <= max; t += max / 4) g += `<line class="grid" x1="${pl}" x2="${W}" y1="${y(t)}" y2="${y(t)}"/><text x="${pl - 8}" y="${y(t) + 4}" text-anchor="end">${Math.round(t)}%</text>`;
+  issues.forEach((x, i) => { const v = vals[i], cx = pl + gw * i + gw / 2, top = y(v), r = Math.min(4, y(0) - top), last = i === n - 1;
+    g += `<g class="col" data-i="${i}"><rect x="${cx - gw / 2}" y="${pt}" width="${gw}" height="${H - pt - pb}" fill="transparent"/><path class="bar${last ? '' : ' dim'}" d="M${cx - bw / 2},${y(0)} V${top + r} Q${cx - bw / 2},${top} ${cx - bw / 2 + r},${top} H${cx + bw / 2 - r} Q${cx + bw / 2},${top} ${cx + bw / 2},${top + r} V${y(0)} Z"/></g>`;
+    if (last) g += `<text class="val" x="${cx}" y="${top - 8}" text-anchor="middle">${v}%</text>`;
+    g += `<text x="${cx}" y="${H - 8}" text-anchor="middle">#${esc(x.issue_no)}</text>`; });
+  return `<div class="chart" id="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Open rate by issue">${g}</svg><div class="tip" id="tip"></div></div>`;
+}
+function wireChart(issues) {
+  const chart = document.getElementById('chart'); if (!chart) return; const tip = document.getElementById('tip');
+  chart.querySelectorAll('.col').forEach(c => { const x = issues[+c.dataset.i], del = x.delivered || x.sent;
+    c.onpointerenter = () => { const r = chart.getBoundingClientRect(), b = c.getBoundingClientRect();
+      tip.innerHTML = `<b>Issue #${esc(x.issue_no)}</b><br>Opened ${pct(x.opened, del)}% · Clicked ${pct(x.clicked, del)}%<br>${fmt(x.sent)} sent`;
+      tip.style.left = (b.left - r.left + b.width / 2) + 'px'; tip.style.top = (b.top - r.top + 20) + 'px'; tip.style.opacity = 1; };
+    c.onpointerleave = () => tip.style.opacity = 0; });
+}
+
+function archivePage(d) {
+  const head = pageHead('Step 6 · Sent', 'Every issue that <em>shipped</em>.', 'Open one to read it exactly as readers got it. Real issues also have a public page you can share.');
+  if (!d.sent_issues.length) return head + '<div class="empty">No issues sent yet. Your first one goes out Thursday after you confirm.</div>';
+  return head + `${d.sent_issues.some(i => i.demo) ? '<div class="note"><div>Issues marked <b>Demo</b> are sample data with placeholder links. They disappear when you type <b>cleardemo</b>.</div></div>' : ''}
+  <div class="issues">${d.sent_issues.map(i => `<details class="iss"><summary><div><b>#${esc(i.issue_no)}</b> ${i.demo ? '<span class="v">Demo</span>' : ''}<br><span>${esc(ist(i.week_start + 'T12:00:00', { day: 'numeric', month: 'short', year: 'numeric' }))} · ${fmt(i.recipients)} readers · ${i.stories.length} stories</span></div><span class="v">Read ▾</span></summary>
+    <div class="body">${i.intro ? `<p class="intro" style="font-size:16px;margin-top:12px">${esc(i.intro)}</p>` : ''}<ol>${i.stories.map(s => `<li>${link(s.url, s.title)} <span class="topic">${esc(s.topic)}</span><p>${esc(s.commentary || '')}</p></li>`).join('')}</ol>
+    ${i.demo ? '' : `<p><a href="/issue/${encodeURIComponent(i.issue_no)}" target="_blank" class="cmd" style="text-decoration:none">Open public page →</a></p>`}</div></details>`).join('')}</div>`;
+}
+
+function sourcesPage(d) {
+  const s = d.sources, kind = { rss: 'RSS feed', gnews: 'News search', newsdata: 'News API' };
+  return pageHead('Where stories come from', `<em>${s.total}</em> sources, read 3× a day.`, `${s.rss} RSS feeds, ${s.news_queries} news searches and ${s.news_api} news API queries. Paste any article link in Telegram to add it by hand.`) +
+  `<div class="checks"><span class="ck ${s.failing ? 'no' : 'ok'}">${s.failing ? `⚠ ${s.failing} need a look` : '✓ All working'}</span>
+    <span class="ck ${s.news_api_connected ? 'ok' : 'no'}">${s.news_api_connected ? '✓ News API connected' : '✗ News API not connected (send “newskey YOUR_KEY” in Telegram)'}</span></div>
+  <div class="srcs">${s.list.map(x => `<div class="src"><span class="ic ${x.ok ? 'ok' : 'no'}">${x.ok ? '✓' : '!'}</span><div><b>${esc(x.name)}</b>
+    <small>${esc(kind[x.kind] || x.kind)} · ${x.ok ? `${fmt(x.new_last_run)} new last run · ${esc(ago(x.last_ok_at) || 'not run yet')}` : esc(x.error || 'error')}</small></div></div>`).join('')}</div>`;
+}
+
+/* ---------- Talk: the Telegram bot's brain, on the website ---------- */
+const TALK_API = 'https://newss.app.n8n.cloud/webhook/dispatch-talk';
+const TALK = { log: [], replyNext: false, dirty: false, speak: false, busy: false, rec: null };
+try { TALK.log = JSON.parse(sessionStorage.getItem('dispatch_talk') || '[]').slice(-40); } catch (e) {}
+const saveTalk = () => { try { sessionStorage.setItem('dispatch_talk', JSON.stringify(TALK.log.slice(-40))); } catch (e) {} };
+function talkPage() {
+  const chips = ['status', 'preview', 'alternates', 'read 1', 'voice', 'suggestions', 'stats', 'help'];
+  return pageHead('Talk to The Dispatch', 'Ask. <em>Decide.</em> Done.', 'Type or speak, exactly as you would in Telegram: “drop 3”, “edit 2: …”, “read 4”, “what’s waiting?”. Every change also updates your Telegram cards. The final send is still confirmed in Telegram, on purpose.') +
+  `<div class="talk card">
+    <div class="log" id="tlog" aria-live="polite"></div>
+    <div class="chips2" id="tchips">${chips.map(c => `<button type="button" data-say="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+    <form class="say" id="tform" autocomplete="off">
+      <textarea id="tin" rows="1" placeholder="Type or speak… e.g. drop 3" aria-label="Message"></textarea>
+      <button type="button" class="mic" id="tmic" aria-label="Speak" title="Tap to speak, tap again to send"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg></button>
+      <button type="submit" class="send" id="tsend">Send</button>
+    </form>
+    <div class="tfoot"><label><input type="checkbox" id="tspeak"> Read replies aloud</label><span id="thint"></span><button type="button" class="linkish" id="tclear">Clear</button></div>
+  </div>`;
+}
+function safeHtml(h) {
+  const doc = new DOMParser().parseFromString('<div>' + String(h || '') + '</div>', 'text/html');
+  const ok = ['b', 'strong', 'i', 'em', 'u', 's', 'code', 'pre', 'a', 'br'];
+  const walk = (n) => { for (const c of [...n.childNodes]) { if (c.nodeType !== 1) continue; walk(c); const t = c.tagName.toLowerCase();
+    if (!ok.includes(t)) { c.replaceWith(...c.childNodes); continue; }
+    for (const a of [...c.attributes]) if (!(t === 'a' && a.name === 'href' && /^https?:\/\//i.test(a.value))) c.removeAttribute(a.name);
+    if (t === 'a') { c.setAttribute('target', '_blank'); c.setAttribute('rel', 'noopener'); } } };
+  const root = doc.body.firstChild; walk(root); return root.innerHTML;
+}
+function drawTalk() {
+  const log = document.getElementById('tlog'); if (!log) return;
+  log.innerHTML = TALK.log.length ? TALK.log.map((m, i) => m.who === 'me'
+    ? `<div class="msg me"><p>${esc(m.text)}</p></div>`
+    : `<div class="msg bot"><div class="bub">${safeHtml(m.html)}</div>${(m.buttons || []).length ? `<div class="btns">${m.buttons.map(b => `<button type="button" data-cb="${esc(b.data)}">${esc(b.text)}</button>`).join('')}</div>` : ''}${m.confirmInTelegram ? '<p class="sub" style="margin:8px 0 0">To send it, tap <b>Confirm &amp; schedule send</b> in Telegram.</p>' : ''}</div>`).join('')
+    : `<div class="hello"><p>Good to see you, Shreya. Try <b>status</b> to see where the draft stands, or tap the microphone and just say it.</p></div>`;
+  log.scrollTop = log.scrollHeight;
+  document.getElementById('thint').textContent = TALK.replyNext ? 'Your next message replaces that commentary.' : '';
+}
+const plain = (h) => { const d = document.createElement('div'); d.innerHTML = safeHtml(h); return d.textContent.replace(/\s+/g, ' ').trim(); };
+async function say(body, label) {
+  if (TALK.busy) return; TALK.busy = true;
+  if (label) TALK.log.push({ who: 'me', text: label });
+  TALK.log.push({ who: 'bot', html: '<i>…</i>', pending: true }); drawTalk();
+  const btn = document.getElementById('tsend'); btn.disabled = true;
+  try {
+    const payload = Object.assign({ key: KEY }, body, TALK.replyNext && body.text ? { reply: true } : {});
+    const r = await fetch(TALK_API, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) });
+    const j = await r.json().catch(() => ({}));
+    TALK.log = TALK.log.filter(m => !m.pending);
+    if (!r.ok || !j.ok) TALK.log.push({ who: 'bot', html: (r.status === 401 || j.error === 'unauthorized') ? 'Your dashboard key was not accepted. Refresh and enter it again.' : 'Sorry, that didn’t go through. Try again in a moment.' });
+    else {
+      TALK.replyNext = !!j.expectReply; TALK.dirty = true;
+      const rs = j.replies && j.replies.length ? j.replies : [{ html: 'Done.' }];
+      rs.forEach(x => TALK.log.push({ who: 'bot', html: x.html, buttons: x.buttons, confirmInTelegram: x.confirmInTelegram }));
+      if (TALK.speak && 'speechSynthesis' in window) { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(plain(rs.map(x => x.html).join('. ')).slice(0, 600)); u.lang = 'en-IN'; speechSynthesis.speak(u); }
+    }
+  } catch (e) { TALK.log = TALK.log.filter(m => !m.pending); TALK.log.push({ who: 'bot', html: 'I couldn’t reach the server. Check your connection and try again.' }); }
+  TALK.busy = false; btn.disabled = false; saveTalk(); drawTalk();
+}
+async function toWavBase64(blob) {
+  const AC = window.AudioContext || window.webkitAudioContext; const ctx = new AC();
+  const audio = await ctx.decodeAudioData(await blob.arrayBuffer()); ctx.close && ctx.close();
+  const rate = 16000, len = Math.max(1, Math.ceil(Math.min(audio.duration, 60) * rate));
+  const off = new OfflineAudioContext(1, len, rate); const src = off.createBufferSource(); src.buffer = audio; src.connect(off.destination); src.start();
+  const pcm = (await off.startRendering()).getChannelData(0);
+  const dv = new DataView(new ArrayBuffer(44 + pcm.length * 2)); const w = (o, s) => [...s].forEach((c, i) => dv.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); dv.setUint32(4, 36 + pcm.length * 2, true); w(8, 'WAVE'); w(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, 'data'); dv.setUint32(40, pcm.length * 2, true);
+  for (let i = 0; i < pcm.length; i++) { const v = Math.max(-1, Math.min(1, pcm[i])); dv.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true); }
+  const bytes = new Uint8Array(dv.buffer); let bin = ''; for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return { b64: btoa(bin), secs: Math.round(audio.duration) };
+}
+function wireTalk() {
+  const form = document.getElementById('tform'); if (!form) return;
+  const tin = document.getElementById('tin'), mic = document.getElementById('tmic'), sp = document.getElementById('tspeak');
+  try { sp.checked = localStorage.getItem('dispatch_speak') === '1'; } catch (e) {} TALK.speak = sp.checked;
+  sp.onchange = () => { TALK.speak = sp.checked; try { localStorage.setItem('dispatch_speak', sp.checked ? '1' : '0'); } catch (e) {} };
+  const send = () => { const t = tin.value.trim(); if (!t) return; tin.value = ''; tin.style.height = ''; say({ text: t }, t); };
+  form.onsubmit = (e) => { e.preventDefault(); send(); };
+  tin.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
+  tin.oninput = () => { tin.style.height = 'auto'; tin.style.height = Math.min(160, tin.scrollHeight) + 'px'; };
+  document.getElementById('tchips').onclick = (e) => { const b = e.target.closest('[data-say]'); if (b) say({ text: b.dataset.say }, b.dataset.say); };
+  document.getElementById('tlog').onclick = (e) => { const b = e.target.closest('[data-cb]'); if (b) say({ callback: b.dataset.cb }, b.textContent.trim()); };
+  document.getElementById('tclear').onclick = () => { TALK.log = []; TALK.replyNext = false; saveTalk(); drawTalk(); };
+  const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+  if (!canRecord) { mic.hidden = true; }
+  mic.onclick = async () => {
+    if (TALK.rec) { TALK.rec.stop(); return; }
+    let stream; try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { TALK.log.push({ who: 'bot', html: 'I need microphone permission to hear you. Allow it in your browser, or type instead.' }); return drawTalk(); }
+    const chunks = []; const rec = new MediaRecorder(stream); TALK.rec = rec; mic.classList.add('on'); const t0 = Date.now();
+    const timer = setInterval(() => { document.getElementById('thint').textContent = 'Listening… ' + Math.round((Date.now() - t0) / 1000) + 's · tap the mic to send'; if (Date.now() - t0 > 60000) rec.stop(); }, 250);
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = async () => { clearInterval(timer); stream.getTracks().forEach(t => t.stop()); TALK.rec = null; mic.classList.remove('on'); document.getElementById('thint').textContent = '';
+      try { const { b64, secs } = await toWavBase64(new Blob(chunks, { type: rec.mimeType })); if (secs < 1) return; TALK.speak = TALK.speak || sp.checked; say({ audio: b64 }, '🎙 Voice message (' + secs + 's)'); }
+      catch (e) { TALK.log.push({ who: 'bot', html: 'I couldn’t process that recording. Try again, or type instead.' }); drawTalk(); } };
+    rec.start();
+  };
+  drawTalk();
+}
+
+/* ---------- load ---------- */
+document.addEventListener('click', e => { const a = e.target.closest('a[href="#"]'); if (a) e.preventDefault(); });
+let KEY = null;
+async function load(k) {
+  KEY = k;
+  try {
+    const d = await (await fetch(API + '?key=' + encodeURIComponent(k))).json();
+    if (d.error) { try { localStorage.removeItem('dispatch_key'); } catch (e) {} return lock('That key was not accepted. Try again.'); }
+    render(d);
+  } catch (e) { app.innerHTML = '<p class="empty" style="margin:40vh auto;max-width:340px">Could not reach the pipeline right now. Try again in a minute.</p>'; }
+}
+const k = getKey(); k ? load(k) : lock();
+</script>
+<script>function fitFrame(f){try{var d=f.contentDocument;if(!d||!d.body)return;d.querySelectorAll("header.top,header.sitebar,p.hint").forEach(function(h){h.remove()});if(!d.querySelector("base")){var b=d.createElement("base");b.target="_top";d.head.prepend(b)}d.documentElement.style.height="auto";d.body.style.minHeight="0";var last=0,fit=function(){var h=Math.ceil(d.body.getBoundingClientRect().height+parseFloat(getComputedStyle(d.body).marginTop||0)+parseFloat(getComputedStyle(d.body).marginBottom||0));if(h>0&&Math.abs(h-last)>2){last=h;f.style.height=h+"px"}};fit();new (d.defaultView.ResizeObserver)(fit).observe(d.body);new ResizeObserver(fit).observe(f);setTimeout(fit,800)}catch(e){}}</script></body>
+</html>

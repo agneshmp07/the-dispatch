@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Dispatch: India's startup ecosystem, curated weekly</title>
+<meta name="description" content="Eight to ten stories every Thursday that are counterintuitive, under-reported, or connect trends nobody else has linked. Curated by Shreya.">
+<meta property="og:title" content="The Dispatch">
+<meta property="og:description" content="India's startup ecosystem, curated weekly. Read by 2,200+ founders, operators and investors.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%23b4441b'/><text x='32' y='45' font-family='Georgia' font-size='40' font-weight='700' text-anchor='middle' fill='white'>D</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f6f3ec; --paper:#fffdf8; --ink:#16130f; --muted:#6b645a; --line:#e3ddd0;
+    --accent:#b4441b; --accent-ink:#fff; --accent-soft:#f3e3d9; --ok:#2f6b3a; --err:#a3261b;
+    --serif:'Fraunces',Georgia,'Times New Roman',serif; --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14120f; --paper:#1c1915; --ink:#f1ece2; --muted:#a59d90; --line:#332e27;
+      --accent:#e0703f; --accent-ink:#1a0e08; --accent-soft:#3a2418; --ok:#7ccf8a; --err:#ff8a7a;
+    }
+  }
+  *{box-sizing:border-box} html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans)}
+  a{color:inherit}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+  header.top{border-bottom:1px solid var(--line);background:var(--paper)}
+  header.top .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .logo{font:700 22px/1 var(--serif);letter-spacing:-.01em;text-decoration:none}
+  .logo span{color:var(--accent)}
+  nav a{font-size:14px;color:var(--muted);text-decoration:none;margin-left:20px}
+  nav a:hover{color:var(--ink)}
+  .hero{padding:72px 0 56px;border-bottom:1px solid var(--line)}
+  .kicker{font:600 12px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  h1{font:700 clamp(36px,6vw,64px)/1.05 var(--serif);letter-spacing:-.02em;margin:16px 0 18px;max-width:14ch}
+  .lede{font-size:clamp(17px,2.2vw,20px);color:var(--muted);max-width:56ch;margin:0 0 28px}
+  form.sub{display:flex;gap:10px;flex-wrap:wrap;max-width:560px}
+  form.sub input[type=email],form.sub input[type=text]{flex:1 1 220px;min-width:0;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font:inherit}
+  form.sub input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+  button{cursor:pointer;border:0;border-radius:10px;padding:14px 22px;background:var(--accent);color:var(--accent-ink);font:600 15px var(--sans)}
+  button:disabled{opacity:.6;cursor:wait}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+  .msg{min-height:24px;margin-top:10px;font-size:14px}
+  form.suggest{display:grid;gap:10px;max-width:640px}
+  form.suggest .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  form.suggest input{min-width:0;width:100%;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font:inherit}
+  form.suggest input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+  form.suggest button{justify-self:start}
+  @media (max-width:560px){form.suggest .row2{grid-template-columns:1fr}form.suggest button{justify-self:stretch}}
+  .msg.ok{color:var(--ok)} .msg.err{color:var(--err)}
+  .proof{display:flex;gap:28px;flex-wrap:wrap;margin-top:28px;color:var(--muted);font-size:14px}
+  .proof b{display:block;font:700 26px/1.1 var(--serif);color:var(--ink)}
+  section{padding:64px 0;border-bottom:1px solid var(--line)}
+  h2{font:700 clamp(26px,3.5vw,34px)/1.15 var(--serif);letter-spacing:-.01em;margin:0 0 8px}
+  .sub2{color:var(--muted);margin:0 0 32px}
+  .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:24px}
+  .card h3{font:700 19px/1.3 var(--serif);margin:10px 0 6px}
+  .card p{margin:0;color:var(--muted);font-size:15px}
+  .num{font:700 13px var(--sans);color:var(--accent);letter-spacing:.08em}
+  .issue{background:var(--paper);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .issue-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;padding:22px 26px;border-bottom:1px solid var(--line)}
+  .issue-head h3{font:700 22px var(--serif);margin:0}
+  .issue-head span{color:var(--muted);font-size:14px}
+  .story{padding:22px 26px;border-bottom:1px solid var(--line)}
+  .story:last-child{border-bottom:0}
+  .topic{font:600 11px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+  .story a.t{display:block;margin:8px 0;font:700 19px/1.35 var(--serif);text-decoration:none}
+  .story a.t:hover{text-decoration:underline;text-decoration-color:var(--accent)}
+  .story p{margin:0;font:17px/1.6 var(--serif);color:var(--ink);opacity:.92}
+  .src{margin-top:8px;font-size:13px;color:var(--muted)}
+  .archive{display:grid;gap:10px;margin-top:28px}
+  .arow{display:flex;justify-content:space-between;gap:16px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 18px;text-decoration:none;cursor:pointer;text-align:left;width:100%;color:var(--ink);font:inherit}
+  .arow:hover{border-color:var(--accent)}
+  .arow b{font:700 16px var(--serif)} .arow span{color:var(--muted);font-size:14px;white-space:nowrap}
+  .about{display:grid;grid-template-columns:120px 1fr;gap:28px;align-items:start}
+  .avatar{width:120px;height:120px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;font:700 44px var(--serif);color:var(--accent)}
+  .cta{background:var(--ink);color:var(--bg);border-radius:20px;padding:48px 36px;text-align:center}
+  .cta h2{color:var(--bg)} .cta p{color:var(--bg);opacity:.75;margin:0 0 24px}
+  .cta form.sub{margin:0 auto}
+  .cta .msg.ok{color:#9fe0a8} .cta .msg.err{color:#ffb4a8}
+  footer{padding:32px 0 48px;color:var(--muted);font-size:14px}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .skel{height:18px;border-radius:6px;background:linear-gradient(90deg,var(--line),var(--paper),var(--line));background-size:200% 100%;animation:sh 1.2s infinite;margin:8px 0}
+  @keyframes sh{to{background-position:-200% 0}}
+  .badge{display:inline-block;font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:4px 10px;margin-left:8px;vertical-align:middle}
+  @media (max-width:640px){
+    nav a:not(.k){display:none} nav a{margin-left:14px}
+    .hero{padding:48px 0 40px} section{padding:48px 0}
+    .about{grid-template-columns:1fr} .avatar{width:80px;height:80px;font-size:30px}
+    .issue-head,.story{padding:18px} .cta{padding:36px 20px}
+    form.sub button{width:100%}
+  }
+  .steps3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+  .howlinks{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+  .btn{display:inline-block;text-decoration:none;border-radius:10px;padding:13px 20px;background:var(--accent);color:var(--accent-ink);font:600 15px var(--sans)}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  .btn.ghost:hover{border-color:var(--accent)}
+  .note2{color:var(--muted);font-size:14px;margin:14px 0 0;max-width:62ch}
+  nav a.cr{color:var(--accent);font-weight:600}
+  @media (max-width:760px){.steps3{grid-template-columns:1fr}}
+  .news{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+  .nc{display:flex;flex-direction:column;background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden;text-decoration:none;color:var(--ink);transition:border-color .15s,transform .15s}
+  .nc:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .nc .im{position:relative;padding-top:56.25%;background:var(--accent-soft)}
+  .nc .im img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .nc .im.mono{display:grid;place-items:center;padding-top:0;aspect-ratio:16/9;font:700 34px var(--serif);color:var(--accent)}
+  .nc .bd{padding:16px 18px 18px}
+  .nc .mt{font:600 11px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+  .nc .mt span{color:var(--muted);letter-spacing:0;text-transform:none;font-weight:500;margin-left:6px}
+  .nc h3{font:700 17px/1.35 var(--serif);margin:10px 0 0}
+  .nmore{display:block;margin:28px auto 0;background:transparent;color:var(--ink);border:1px solid var(--line)}
+  .nmore:hover{border-color:var(--accent)}
+  @media (max-width:900px){.news{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width:560px){.news{grid-template-columns:minmax(0,1fr)}}
+</style>
+
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="logo" href="#">The Dispatch<span>.</span></a>
+  <nav><a href="#news">News</a><a href="#latest">Latest issue</a><a href="#archive">Archive</a><a href="#how">How it works</a><a href="#suggest">Suggest a story</a><a class="k" href="#subscribe">Subscribe</a><a class="k cr" href="/control">Control Room</a></nav>
+</div></header>
+
+<main>
+  <div class="hero"><div class="wrap">
+    <div class="kicker">Every Thursday · Free</div>
+    <h1>India's startup ecosystem, minus the noise.</h1>
+    <p class="lede">Eight to ten stories a week that are counterintuitive, under-reported, or connect two trends nobody else has linked. Each comes with two lines on why it matters.</p>
+    <form class="sub" data-source="hero" novalidate>
+      <input type="email" name="email" placeholder="you@company.com" autocomplete="email" required aria-label="Email address">
+      <input class="hp" type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button type="submit">Subscribe</button>
+    </form>
+    <div class="msg" role="status" aria-live="polite"></div>
+    <div class="proof">
+      <div><b id="statReaders">2,200+</b>readers</div>
+      <div><b>38%</b>open rate</div>
+      <div><b>4 hrs</b>of reading, saved weekly</div>
+    </div>
+  </div></div>
+
+  <section id="news"><div class="wrap">
+    <div class="kicker">Live from the newsroom</div>
+    <h2 style="margin-top:14px">This week's news</h2>
+    <p class="sub2" id="newsSub">Fresh from the 28 sources the pipeline reads three times a day. Shreya picks the best of these for Thursday's issue.</p>
+    <div class="news" id="newsGrid"><div class="skel" style="height:220px"></div><div class="skel" style="height:220px"></div><div class="skel" style="height:220px"></div></div>
+    <button type="button" class="nmore" id="newsMore" hidden>Show more</button>
+  </div></section>
+
+
+<section><div class="wrap">
+    <h2>Why readers stay</h2>
+    <p class="sub2">Not a roundup. A point of view.</p>
+    <div class="grid3">
+      <div class="card"><div class="num">01</div><h3>Curated, not aggregated</h3><p>Sixty-plus articles read every week; only the ones with real signal make the cut.</p></div>
+      <div class="card"><div class="num">02</div><h3>The angle you missed</h3><p>Every story comes with two lines on what it means, not a summary of the headline.</p></div>
+      <div class="card"><div class="num">03</div><h3>Five-minute read</h3><p>Built for founders, operators and investors who already read the news and want the context.</p></div>
+    </div>
+  </div></section>
+
+  <section id="latest"><div class="wrap">
+    <h2>Latest issue</h2>
+    <p class="sub2" id="latestSub">A taste of what lands in your inbox.</p>
+    <div id="latestIssue" class="issue"><div style="padding:26px"><div class="skel" style="width:40%"></div><div class="skel"></div><div class="skel" style="width:85%"></div><div class="skel"></div></div></div>
+  </div></section>
+
+  <section id="archive"><div class="wrap">
+    <h2>Archive</h2>
+    <p class="sub2">Past issues, in full.</p>
+    <div id="archiveList" class="archive"></div>
+  </div></section>
+
+  <section id="about"><div class="wrap about">
+    <div class="avatar" aria-hidden="true">S</div>
+    <div>
+      <h2>About</h2>
+      <p>The Dispatch is written by <b>Shreya</b>, who has covered the Indian startup ecosystem for over two years. Each week she reads through twenty-plus sources so you don't have to, and picks what's worth your attention.</p>
+      <p style="color:var(--muted)">Have a tip or a story we should know about? Reply to any issue; it reaches her directly.</p>
+    </div>
+  </div></section>
+
+  <section id="how"><div class="wrap">
+    <div class="kicker">Behind the issue</div>
+    <h2 style="margin-top:14px">How each issue gets made</h2>
+    <p class="sub2">Software does the reading. Shreya makes every call. Nothing is sent until she confirms it.</p>
+    <div class="steps3">
+      <div class="card"><div class="num">01 · MON–WED</div><h3>Collect</h3><p>28 sources are read three times a day. Repeats are removed, and reader suggestions join the pile.</p></div>
+      <div class="card"><div class="num">02 · WEDNESDAY</div><h3>Draft &amp; review</h3><p>An AI editor shortlists 8 to 10 stories across at least three topics. Shreya keeps, swaps or rewrites each one.</p></div>
+      <div class="card"><div class="num">03 · THURSDAY</div><h3>Send</h3><p>Once Shreya confirms, the issue goes out from 8 a.m. and joins the archive on this site.</p></div>
+    </div>
+    <div class="howlinks">
+      <a class="btn" href="/how-it-works">See the full workflow →</a>
+      <a class="btn ghost" href="/control">Open the Control Room →</a>
+    </div>
+    <p class="note2">The Control Room is Shreya's live dashboard for the week: articles collected, the draft, reader numbers and a chat with the assistant. It asks for a PIN.</p>
+  </div></section>
+
+  <section id="suggest"><div class="wrap">
+    <h2>Suggest a story</h2>
+    <p class="sub2">Spotted something Shreya should read? Send the link. She sees every suggestion before Wednesday's draft, and the good ones make the issue.</p>
+    <form class="suggest" novalidate>
+      <input type="url" name="url" placeholder="https://… link to the story" required aria-label="Link to the story">
+      <input type="text" name="note" maxlength="400" placeholder="Why it matters (optional)" aria-label="Why it matters">
+      <div class="row2">
+        <input type="text" name="name" maxlength="80" placeholder="Your name (optional)" autocomplete="name" aria-label="Your name">
+        <input type="email" name="email" placeholder="Email (optional)" autocomplete="email" aria-label="Your email">
+      </div>
+      <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button type="submit">Send suggestion</button>
+    </form>
+    <div class="msg" role="status" aria-live="polite"></div>
+  </div></section>
+
+  <section id="subscribe" style="border-bottom:0"><div class="wrap">
+    <div class="cta">
+      <h2>Get Thursday's issue</h2>
+      <p>Free. One email a week. Unsubscribe in one click.</p>
+      <form class="sub" data-source="footer" novalidate>
+        <input type="email" name="email" placeholder="you@company.com" autocomplete="email" required aria-label="Email address">
+        <input class="hp" type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button type="submit">Subscribe</button>
+      </form>
+      <div class="msg" role="status" aria-live="polite"></div>
+    </div>
+  </div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>© <span id="yr"></span> The Dispatch</span>
+  <span>Made in India · Sent every Thursday · <a href="/how-it-works">How it works</a> · <a href="/control">Control Room</a></span>
+</div></footer>
+
+<script>
+const API = 'https://newss.app.n8n.cloud/webhook';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = d => new Date(d + (String(d).length === 10 ? 'T12:00:00+05:30' : '')).toLocaleDateString('en-IN', {day:'numeric', month:'long', year:'numeric'});
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+// ---- subscribe forms ----
+document.querySelectorAll('form.sub').forEach(form => {
+  const msg = form.nextElementSibling;
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = form.email.value.trim();
+    if (form.company.value) return;                        // bot honeypot
+    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) { msg.className = 'msg err'; msg.textContent = 'Please enter a valid email address.'; return; }
+    const btn = form.querySelector('button'); btn.disabled = true; btn.textContent = 'Subscribing…';
+    try {
+      const r = await fetch(API + '/dispatch-subscribe', { method: 'POST', headers: {'Content-Type': 'text/plain'},
+        body: JSON.stringify({ email, source: form.dataset.source }) });
+      const j = await r.json();
+      msg.className = 'msg ' + (j.ok ? 'ok' : 'err'); msg.textContent = j.message || (j.ok ? 'Subscribed!' : 'Something went wrong.');
+      if (j.ok) form.reset();
+    } catch (err) {
+      msg.className = 'msg err'; msg.textContent = 'Could not reach the server. Please try again in a minute.';
+    } finally { btn.disabled = false; btn.textContent = 'Subscribe'; }
+  });
+});
+
+// ---- suggest a story ----
+(() => {
+  const form = document.querySelector('form.suggest'); if (!form) return;
+  const msg = form.nextElementSibling, btn = form.querySelector('button');
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const url = form.url.value.trim(), email = form.email.value.trim();
+    if (!/^https?:\/\/\S+\.\S+/i.test(url)) { msg.className = 'msg err'; msg.textContent = 'Please paste the full link, starting with https://'; return; }
+    if (email && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) { msg.className = 'msg err'; msg.textContent = 'That email doesn\'t look right. You can leave it blank.'; return; }
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      const r = await fetch(API + '/dispatch-suggest', { method: 'POST', headers: {'Content-Type': 'text/plain'},
+        body: JSON.stringify({ url, note: form.note.value.trim(), name: form.name.value.trim(), email, website: form.website.value }) });
+      const j = await r.json();
+      msg.className = 'msg ' + (j.ok ? 'ok' : 'err'); msg.textContent = j.message || (j.ok ? 'Thanks!' : 'Something went wrong.');
+      if (j.ok) form.reset();
+    } catch (err) {
+      msg.className = 'msg err'; msg.textContent = 'Could not reach the server. Please try again in a minute.';
+    } finally { btn.disabled = false; btn.textContent = 'Send suggestion'; }
+  });
+})();
+
+// ---- latest issue + archive ----
+const SAMPLE = { issue_no: 'Sample', week_start: null, sample: true, stories: [
+  { topic: 'Fintech', title: 'RBI\'s new digital-lending rules quietly favour bank-backed NBFCs', source: 'Mint',
+    commentary: 'Everyone read this as a crackdown on fintech lenders. The real story is who it protects: NBFCs with a bank parent can now underwrite at a cost independents can\'t match.' },
+  { topic: 'Funding & VC', title: 'Seed rounds are shrinking, but the number of cheques is up 30%', source: 'Entrackr',
+    commentary: 'Smaller rounds, more of them. Angels are spreading bets rather than leaving the market, which is good news for first-time founders outside Bengaluru.' },
+  { topic: 'E-commerce & Quick Commerce', title: 'Quick-commerce players are now the biggest buyers of urban warehouse space', source: 'Business Standard',
+    commentary: 'Read this alongside the commercial real-estate numbers: dark stores have quietly become a property story, not just a delivery story.' },
+]};
+function renderIssue(is) {
+  const head = is.sample
+    ? `<h3>Sample issue <span class="badge">Preview</span></h3><span>What a typical issue looks like</span>`
+    : `<h3><a href="/issue/${encodeURIComponent(is.issue_no)}" style="text-decoration:none">Issue #${esc(is.issue_no)}</a></h3><span>${esc(fmtDate(is.week_start))} · <a href="/issue/${encodeURIComponent(is.issue_no)}" style="color:var(--accent)">Open & share →</a></span>`;
+  return `<div class="issue-head">${head}</div>` + (is.stories || []).map(s => `
+    <article class="story">
+      <div class="topic">${esc(s.topic)}</div>
+      ${s.url ? `<a class="t" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>` : `<span class="t" style="display:block;margin:8px 0;font:700 19px/1.35 var(--serif)">${esc(s.title)}</span>`}
+      <p>${esc(s.commentary)}</p>
+      ${s.source ? `<div class="src">${esc(s.source)}</div>` : ''}
+    </article>`).join('');
+}
+(async () => {
+  const latest = document.getElementById('latestIssue'), list = document.getElementById('archiveList');
+  let data = null;
+  try { const r = await fetch(API + '/dispatch-archive'); data = await r.json(); } catch (e) {}
+  const issues = (data && data.issues) || [];
+  if (data && data.subscribers > 2200) document.getElementById('statReaders').textContent = data.subscribers.toLocaleString('en-IN') + '+';
+  latest.innerHTML = renderIssue(issues[0] || SAMPLE);
+  if (!issues.length) { list.innerHTML = '<p class="sub2">The archive fills up as issues are sent.</p>'; return; }
+  list.innerHTML = issues.map(is => `<a class="arow" href="/issue/${encodeURIComponent(is.issue_no)}"><b>Issue #${esc(is.issue_no)}: ${esc((is.stories && is.stories[0] && is.stories[0].title) || '')}</b><span>${esc(fmtDate(is.week_start))}</span></a>`).join('');
+})();
+</script>
+<script>
+(function () {
+  var grid = document.getElementById('newsGrid'); if (!grid) return;
+  var E = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var ago = function (t) { var h = (Date.now() - new Date(t)) / 36e5; return !t ? '' : h < 1 ? 'just now' : h < 24 ? Math.round(h) + 'h ago' : Math.round(h / 24) + 'd ago'; };
+  var items = [], shown = 0;
+  function card(it) {
+    var src = String(it.source || 'News').replace(/^www\./, '');
+    var title = String(it.title || '').replace(/\s+[-|–]\s+[^-|–]{2,40}$/, '');
+    var ok = /^https?:\/\//i.test(it.url || '');
+    var im = /^https:\/\//i.test(it.image || '') ? '<div class="im"><img src="' + E(it.image) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="var p=this.parentNode;p.classList.add(\'mono\');p.innerHTML=\'' + E(src.charAt(0).toUpperCase()) + '\'"></div>' : '<div class="im mono">' + E(src.charAt(0).toUpperCase()) + '</div>';
+    return '<a class="nc" href="' + (ok ? E(it.url) : '#') + '" target="_blank" rel="noopener">' + im + '<div class="bd"><div class="mt">' + E(src) + '<span>' + E(ago(it.at)) + '</span></div><h3>' + E(title) + '</h3></div></a>';
+  }
+  function more() { var next = items.slice(shown, shown + 6); grid.insertAdjacentHTML('beforeend', next.map(card).join('')); shown += next.length; document.getElementById('newsMore').hidden = shown >= items.length; }
+  document.getElementById('newsMore').onclick = more;
+  fetch('https://newss.app.n8n.cloud/webhook/dispatch-news').then(function (r) { return r.json(); }).then(function (d) {
+    items = (d && d.items) || []; grid.innerHTML = '';
+    if (!items.length) { grid.innerHTML = '<p class="sub2">Stories appear here as the pipeline collects them, Monday to Wednesday.</p>'; return; }
+    if (d.week_count) document.getElementById('newsSub').textContent = d.week_count.toLocaleString('en-IN') + ' stories collected this week from 28 sources, read three times a day. Here are the latest. Shreya picks the best for Thursday’s issue.';
+    more();
+  }).catch(function () { grid.innerHTML = '<p class="sub2">The news feed is taking a break. Try again in a minute.</p>'; });
+})();
+</script>
+</body>
+</html>

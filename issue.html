@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Dispatch: issue</title>
+<meta name="description" content="An issue of The Dispatch: India's startup ecosystem, curated weekly.">
+<meta property="og:title" content="The Dispatch">
+<meta property="og:description" content="India's startup ecosystem, curated weekly. Eight to ten stories with two lines on why each matters.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f6f3ec; --paper:#fffdf8; --ink:#16130f; --muted:#6b645a; --line:#e3ddd0;
+    --accent:#b4441b; --accent-ink:#fff; --accent-soft:#f3e3d9; --ok:#2f6b3a; --err:#a3261b;
+    --serif:'Fraunces',Georgia,'Times New Roman',serif; --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14120f; --paper:#1c1915; --ink:#f1ece2; --muted:#a59d90; --line:#332e27;
+      --accent:#e0703f; --accent-ink:#1a0e08; --accent-soft:#3a2418; --ok:#7ccf8a; --err:#ff8a7a;
+    }
+  }
+  *{box-sizing:border-box} html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans)}
+  a{color:inherit}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+  header.top{border-bottom:1px solid var(--line);background:var(--paper)}
+  header.top .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .logo{font:700 22px/1 var(--serif);letter-spacing:-.01em;text-decoration:none}
+  .logo span{color:var(--accent)}
+  nav a{font-size:14px;color:var(--muted);text-decoration:none;margin-left:20px}
+  nav a:hover{color:var(--ink)}
+  .hero{padding:72px 0 56px;border-bottom:1px solid var(--line)}
+  .kicker{font:600 12px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  h1{font:700 clamp(36px,6vw,64px)/1.05 var(--serif);letter-spacing:-.02em;margin:16px 0 18px;max-width:14ch}
+  .lede{font-size:clamp(17px,2.2vw,20px);color:var(--muted);max-width:56ch;margin:0 0 28px}
+  form.sub{display:flex;gap:10px;flex-wrap:wrap;max-width:560px}
+  form.sub input[type=email],form.sub input[type=text]{flex:1 1 220px;min-width:0;padding:14px 16px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font:inherit}
+  form.sub input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+  button{cursor:pointer;border:0;border-radius:10px;padding:14px 22px;background:var(--accent);color:var(--accent-ink);font:600 15px var(--sans)}
+  button:disabled{opacity:.6;cursor:wait}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+  .msg{min-height:24px;margin-top:10px;font-size:14px}
+  .msg.ok{color:var(--ok)} .msg.err{color:var(--err)}
+  .proof{display:flex;gap:28px;flex-wrap:wrap;margin-top:28px;color:var(--muted);font-size:14px}
+  .proof b{display:block;font:700 26px/1.1 var(--serif);color:var(--ink)}
+  section{padding:64px 0;border-bottom:1px solid var(--line)}
+  h2{font:700 clamp(26px,3.5vw,34px)/1.15 var(--serif);letter-spacing:-.01em;margin:0 0 8px}
+  .sub2{color:var(--muted);margin:0 0 32px}
+  .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:24px}
+  .card h3{font:700 19px/1.3 var(--serif);margin:10px 0 6px}
+  .card p{margin:0;color:var(--muted);font-size:15px}
+  .num{font:700 13px var(--sans);color:var(--accent);letter-spacing:.08em}
+  .issue{background:var(--paper);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .issue-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;padding:22px 26px;border-bottom:1px solid var(--line)}
+  .issue-head h3{font:700 22px var(--serif);margin:0}
+  .issue-head span{color:var(--muted);font-size:14px}
+  .story{padding:22px 26px;border-bottom:1px solid var(--line)}
+  .story:last-child{border-bottom:0}
+  .topic{font:600 11px/1 var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+  .story a.t{display:block;margin:8px 0;font:700 19px/1.35 var(--serif);text-decoration:none}
+  .story a.t:hover{text-decoration:underline;text-decoration-color:var(--accent)}
+  .story p{margin:0;font:17px/1.6 var(--serif);color:var(--ink);opacity:.92}
+  .src{margin-top:8px;font-size:13px;color:var(--muted)}
+  .archive{display:grid;gap:10px;margin-top:28px}
+  .arow{display:flex;justify-content:space-between;gap:16px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 18px;text-decoration:none;cursor:pointer;text-align:left;width:100%;color:var(--ink);font:inherit}
+  .arow:hover{border-color:var(--accent)}
+  .arow b{font:700 16px var(--serif)} .arow span{color:var(--muted);font-size:14px;white-space:nowrap}
+  .about{display:grid;grid-template-columns:120px 1fr;gap:28px;align-items:start}
+  .avatar{width:120px;height:120px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;font:700 44px var(--serif);color:var(--accent)}
+  .cta{background:var(--ink);color:var(--bg);border-radius:20px;padding:48px 36px;text-align:center}
+  .cta h2{color:var(--bg)} .cta p{color:var(--bg);opacity:.75;margin:0 0 24px}
+  .cta form.sub{margin:0 auto}
+  .cta .msg.ok{color:#9fe0a8} .cta .msg.err{color:#ffb4a8}
+  footer{padding:32px 0 48px;color:var(--muted);font-size:14px}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .skel{height:18px;border-radius:6px;background:linear-gradient(90deg,var(--line),var(--paper),var(--line));background-size:200% 100%;animation:sh 1.2s infinite;margin:8px 0}
+  @keyframes sh{to{background-position:-200% 0}}
+  .badge{display:inline-block;font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:4px 10px;margin-left:8px;vertical-align:middle}
+  @media (max-width:640px){
+    nav a:not(:last-child){display:none}
+    .hero{padding:48px 0 40px} section{padding:48px 0}
+    .about{grid-template-columns:1fr} .avatar{width:80px;height:80px;font-size:30px}
+    .issue-head,.story{padding:18px} .cta{padding:36px 20px}
+    form.sub button{width:100%}
+  }
+
+  main{padding:40px 0 64px}
+  .crumb{font-size:14px;color:var(--muted);margin-bottom:18px} .crumb a{text-decoration:none;color:var(--accent)}
+  .ihead{margin-bottom:22px}
+  .ihead h1{font:700 clamp(30px,5vw,46px)/1.1 var(--serif);margin:8px 0 6px;max-width:none}
+  .ihead .meta{color:var(--muted);font-size:15px}
+  .intro{font:italic 19px/1.6 var(--serif);margin:0;padding:22px 26px;border-bottom:1px solid var(--line)}
+  .sponsor{margin:0;padding:20px 26px;background:var(--accent-soft);border-top:1px solid var(--line)}
+  .sponsor .lbl{font:600 11px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .share{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0 0}
+  .share a,.share button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:9px 16px;font:500 14px var(--sans);text-decoration:none;cursor:pointer}
+  .share a:hover,.share button:hover{border-color:var(--accent)}
+  .pager{display:flex;justify-content:space-between;gap:12px;margin:26px 0 0}
+  .pager a{color:var(--accent);text-decoration:none;font-weight:600}
+  .cta{margin-top:48px}
+  .empty{padding:36px 26px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="logo" href="/">The Dispatch<span>.</span></a>
+  <nav><a href="/#archive">Archive</a><a href="#subscribe">Subscribe</a></nav>
+</div></header>
+
+<main><div class="wrap">
+  <div class="crumb"><a href="/">← The Dispatch</a></div>
+  <div class="ihead" id="ihead"><div class="skel" style="width:30%"></div><div class="skel" style="width:60%;height:34px"></div></div>
+  <div id="issue" class="issue"><div style="padding:26px"><div class="skel"></div><div class="skel" style="width:85%"></div><div class="skel"></div></div></div>
+  <div class="share" id="share" hidden>
+    <button type="button" id="copy">🔗 Copy link</button>
+    <a id="wa" target="_blank" rel="noopener">WhatsApp</a>
+    <a id="li" target="_blank" rel="noopener">LinkedIn</a>
+    <a id="tw" target="_blank" rel="noopener">X</a>
+  </div>
+  <div class="pager" id="pager"></div>
+
+  <div class="cta" id="subscribe">
+    <h2>Get the next issue on Thursday</h2>
+    <p>Free. One email a week. Unsubscribe in one click.</p>
+    <form class="sub" data-source="issue-page" novalidate>
+      <input type="email" name="email" placeholder="you@company.com" autocomplete="email" required aria-label="Email address">
+      <input class="hp" type="text" name="company" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button type="submit">Subscribe</button>
+    </form>
+    <div class="msg" role="status" aria-live="polite"></div>
+  </div>
+</div></main>
+
+<footer><div class="wrap">
+  <span>© <span id="yr"></span> The Dispatch</span>
+  <span>Made in India · Sent every Thursday</span>
+</div></footer>
+
+<script>
+const API = 'https://newss.app.n8n.cloud/webhook';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = d => new Date(d + (String(d).length === 10 ? 'T12:00:00+05:30' : '')).toLocaleDateString('en-IN', {day:'numeric', month:'long', year:'numeric'});
+const safeUrl = u => /^https?:\/\//i.test(String(u || '')) ? u : '';
+document.getElementById('yr').textContent = new Date().getFullYear();
+
+const m = location.pathname.match(/\/issue\/(\d+)/);
+const N = m ? m[1] : (new URLSearchParams(location.search).get('n') || '').replace(/\D/g, '');
+const head = document.getElementById('ihead'), box = document.getElementById('issue');
+
+function notFound(msg) {
+  head.innerHTML = '<div class="kicker">The Dispatch</div><h1>Issue not found</h1>';
+  box.innerHTML = `<div class="empty">${esc(msg)} <a href="/#archive" style="color:var(--accent)">Browse the archive →</a></div>`;
+}
+
+(async () => {
+  if (!N) return notFound('That link is missing an issue number.');
+  let d = null;
+  try { d = await (await fetch(API + '/dispatch-issue?n=' + N)).json(); } catch (e) {}
+  if (!d) return notFound('Could not load this issue right now. Please try again in a minute.');
+  if (d.error) return notFound('This issue does not exist or has not been sent yet.');
+  const title = `Issue #${d.issue_no}`;
+  const lead = (d.stories[0] && d.stories[0].title) || '';
+  document.title = `${title}: ${lead} · The Dispatch`;
+  document.querySelector('meta[name=description]').content = `${title} of The Dispatch: ${lead}`;
+  head.innerHTML = `<div class="kicker">The Dispatch · ${esc(fmtDate(d.week_start))}</div><h1>${esc(title)}</h1><div class="meta">${d.stories.length} stories · about ${Math.max(3, Math.round(d.stories.length * 0.6))} minutes</div>`;
+  box.innerHTML = (d.intro ? `<p class="intro">${esc(d.intro)}</p>` : '') +
+    d.stories.map(s => `<article class="story">
+      <div class="topic">${esc(s.topic)}</div>
+      ${safeUrl(s.url) ? `<a class="t" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a>` : `<span class="t" style="display:block;margin:8px 0;font:700 19px/1.35 var(--serif)">${esc(s.title)}</span>`}
+      <p>${esc(s.commentary)}</p>
+      ${s.source ? `<div class="src">${esc(s.source)}</div>` : ''}
+    </article>`).join('') +
+    (d.sponsor && d.sponsor.text ? `<div class="sponsor"><div class="lbl">Sponsored</div><div>${esc(d.sponsor.text)}${safeUrl(d.sponsor.url) ? ` <a href="${esc(d.sponsor.url)}" target="_blank" rel="noopener sponsored" style="color:var(--accent)">Learn more →</a>` : ''}</div></div>` : '');
+
+  const url = location.origin + '/issue/' + d.issue_no;
+  const text = `${title} of The Dispatch: ${lead}`;
+  document.getElementById('wa').href = 'https://wa.me/?text=' + encodeURIComponent(text + ' ' + url);
+  document.getElementById('li').href = 'https://www.linkedin.com/sharing/share-offsite/?url=' + encodeURIComponent(url);
+  document.getElementById('tw').href = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url);
+  const copy = document.getElementById('copy');
+  copy.onclick = async () => { try { await navigator.clipboard.writeText(url); copy.textContent = '✅ Link copied'; } catch (e) { prompt('Copy this link:', url); } };
+  document.getElementById('share').hidden = false;
+  document.getElementById('pager').innerHTML =
+    (d.prev ? `<a href="/issue/${d.prev}">← Issue #${esc(d.prev)}</a>` : '<span></span>') +
+    (d.next ? `<a href="/issue/${d.next}">Issue #${esc(d.next)} →</a>` : '<span></span>');
+})();
+
+// subscribe form (same endpoint as the home page)
+document.querySelectorAll('form.sub').forEach(form => {
+  const msg = form.nextElementSibling;
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = form.email.value.trim();
+    if (form.company.value) return;
+    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) { msg.className = 'msg err'; msg.textContent = 'Please enter a valid email address.'; return; }
+    const btn = form.querySelector('button'); btn.disabled = true; btn.textContent = 'Subscribing…';
+    try {
+      const r = await fetch(API + '/dispatch-subscribe', { method: 'POST', headers: {'Content-Type': 'text/plain'}, body: JSON.stringify({ email, source: form.dataset.source }) });
+      const j = await r.json();
+      msg.className = 'msg ' + (j.ok ? 'ok' : 'err'); msg.textContent = j.message || (j.ok ? 'Subscribed!' : 'Something went wrong.');
+      if (j.ok) form.reset();
+    } catch (err) { msg.className = 'msg err'; msg.textContent = 'Could not reach the server. Please try again in a minute.'; }
+    finally { btn.disabled = false; btn.textContent = 'Subscribe'; }
+  });
+});
+</script>
+</body>
+</html>

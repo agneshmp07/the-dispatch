@@ -1,0 +1,7 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/issue/:n", "destination": "/issue" },
+    { "source": "/control", "destination": "/dashboard" }
+  ]
+}
